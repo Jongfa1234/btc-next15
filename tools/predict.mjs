@@ -47,8 +47,11 @@ async function kalshiMarkets() {
   for (const base of KAL) {
     try {
       const j = await getJSON(`${base}/markets?series_ticker=KXBTC15M&status=open&limit=50`, 2);
-      return (j.markets || []).map((m) => ({ end: Date.parse(m.close_time), strike: pos(m.floor_strike) ?? pos(m.functional_strike) ?? pos(m.custom_strike) ?? pos(m.cap_strike),
-        bid: pos(m.yes_bid_dollars), ask: pos(m.yes_ask_dollars), last: pos(m.last_price_dollars) })).filter((m) => m.strike);
+      // KXBTC15M = Robinhood's "BTC 15 min" Up/Down contracts. floor_strike is the window's Target
+      // (the 60-second BRTI average before the window started). Yes = Up, No = Down.
+      return (j.markets || []).map((m) => ({ start: Date.parse(m.open_time), end: Date.parse(m.close_time), strike: pos(m.floor_strike),
+        bid: pos(m.yes_bid_dollars), ask: pos(m.yes_ask_dollars), noBid: pos(m.no_bid_dollars), noAsk: pos(m.no_ask_dollars),
+        last: pos(m.last_price_dollars) })).filter((m) => isFinite(m.end));
     } catch {}
   }
   return null;
@@ -79,16 +82,19 @@ async function main() {
   }
   // 2. Record Robinhood's target and crowd price for this window the first time it shows up.
   const cur = E.find((e) => e.start === start);
+  const ms = await kalshiMarkets();
+  // The app can't read Kalshi directly (it blocks web pages), so publish a snapshot it can read.
+  if (ms) fs.writeFileSync(LOG.replace(/[^/]*$/, "") + "kalshi.json",
+    JSON.stringify({ updated: new Date(now).toISOString(), markets: ms.map((m) => ({ start: m.start, end: m.end, target: m.strike, upBid: m.bid, upAsk: m.ask, downBid: m.noBid, downAsk: m.noAsk })) }));
   if (cur && cur.strike == null) {
-    const ms = await kalshiMarkets();
-    const m = ms && ms.find((x) => Math.abs(x.end - end) < 60000);
+    const m = ms && ms.find((x) => Math.abs(x.end - end) < 60000 && x.strike);
     const late = now - start > 6 * 60000; // later than this, the crowd price already reflects much of the window
     if (m && late) { cur.strike = m.strike; notes.push(`kalshi strike ${m.strike} (too late in the window to follow)`); }
     else if (m) {
       cur.strike = m.strike; cur.crowd = m.bid && m.ask ? Math.round((m.bid + m.ask) / 2 * 1000) / 1000 : m.last; cur.crowdAt = new Date(now).toISOString();
       // Assume the best call is followed: buy the likelier side at Robinhood's ask (or mid) if every check passes.
       const up = cur.pUp >= 0.5, bestP = Math.max(cur.pUp, 1 - cur.pUp);
-      const price = up ? (m.ask ?? cur.crowd) : (m.bid != null ? 1 - m.bid : (cur.crowd != null ? 1 - cur.crowd : null));
+      const price = up ? (m.ask ?? cur.crowd) : (m.noAsk ?? (m.bid != null ? 1 - m.bid : null));
       const pc = M.playCheck(bestP, cur.past && { ...cur.past }, price);
       cur.follow = { play: pc.play, side: up ? "above" : "below", price: price != null ? Math.round(price * 1000) / 1000 : null, minutesIn: Math.round((now - start) / 6000) / 10 };
       notes.push(`kalshi strike ${m.strike}, ${pc.play ? "PLAY " + cur.follow.side : "skip"}`);

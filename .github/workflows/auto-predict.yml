@@ -45,7 +45,7 @@ jobs:
       - name: Save the log
         working-directory: ${{ runner.temp }}/data
         run: |
-          git add log.json
+          git add log.json kalshi.json 2>/dev/null || git add log.json
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -q -m "Update prediction log"
           git push origin data

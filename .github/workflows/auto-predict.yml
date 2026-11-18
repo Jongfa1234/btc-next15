@@ -1,7 +1,8 @@
 name: Auto predictions
 
 # Makes a prediction for each 15-minute window and checks finished ones, even when nobody has the app open.
-# GitHub runs scheduled jobs on a best-effort basis, so a run can start a few minutes late.
+# GitHub's schedule is best-effort and can skip runs for a long time, so each run works for about
+# 12 minutes (refreshing every minute) and then starts the next run itself. The schedule is only a backup.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -9,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: auto-predict
@@ -17,7 +19,7 @@ concurrency:
 jobs:
   predict:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,13 +41,23 @@ jobs:
             git worktree add --orphan -b data "$RUNNER_TEMP/data"
           fi
 
-      - name: Predict and check
-        run: node tools/predict.mjs "$RUNNER_TEMP/data/log.json"
-
-      - name: Save the log
-        working-directory: ${{ runner.temp }}/data
+      - name: Predict, check and save (every minute for about 12 minutes)
         run: |
-          git add log.json kalshi.json 2>/dev/null || git add log.json
-          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
-          git commit -q -m "Update prediction log"
-          git push origin data
+          for i in $(seq 1 12); do
+            node tools/predict.mjs "$RUNNER_TEMP/data/log.json" || echo "Run $i failed"
+            (
+              cd "$RUNNER_TEMP/data"
+              git add log.json kalshi.json 2>/dev/null || git add log.json
+              if ! git diff --cached --quiet; then
+                git commit -q -m "Update prediction log"
+                git push -q origin data || echo "Push failed"
+              fi
+            )
+            if [ "$i" -lt 12 ]; then sleep 55; fi
+          done
+
+      - name: Start the next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run auto-predict.yml --ref main -R "$GITHUB_REPOSITORY"

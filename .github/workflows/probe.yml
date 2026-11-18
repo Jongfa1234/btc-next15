@@ -1,0 +1,25 @@
+name: Probe data sources (temporary)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check browser access headers and sample responses
+        run: |
+          O="Origin: https://jongfa1234.github.io"
+          for u in \
+            "https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=KXBTC15M&status=open&limit=3" \
+            "https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXBTC15M&status=open&limit=3" \
+            "https://api.kraken.com/0/public/Ticker?pair=XBTUSD" \
+            "https://www.bitstamp.net/api/v2/ticker/btcusd/" \
+            "https://api.gemini.com/v1/pubticker/btcusd" \
+            "https://api.exchange.coinbase.com/products/BTC-USD/ticker" \
+            "https://api.coinbase.com/v2/prices/BTC-USD/spot" ; do
+            echo "=== $u"
+            curl -s -D - -o /tmp/body -H "$O" -m 15 "$u" | grep -i -E "^HTTP|access-control-allow-origin" || true
+            head -c 2500 /tmp/body; echo
+          done

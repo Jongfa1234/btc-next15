@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BTC Next 15</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column. The call first, then live order flow, then the out-of-sample evidence, then your own record. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --fg:#16181a; --muted:#5d636a; --line:#d9ddd6;
+  --accent:#e08a00; --on-accent:#1b1200; --up:#0f8a5f; --down:#c8372d; --flat:#6b7280;
+  --display:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1113; --surface:#171a1d; --fg:#eceee9; --muted:#9aa1a8; --line:#2a2f34;
+  --accent:#f5a524; --on-accent:#1b1200; --up:#34c38f; --down:#f06a5f; --flat:#9aa1a8; color-scheme:dark;}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--display);
+  padding-block:max(20px,env(safe-area-inset-top)) max(32px,env(safe-area-inset-bottom));
+  padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
+main{max-width:580px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;font-weight:800;letter-spacing:-.01em;margin:0}
+h1 span{color:var(--accent)}
+h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.price{font-size:14px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.call{display:flex;flex-direction:column;gap:14px}
+.verdict{display:flex;align-items:center;gap:14px}
+.arrow{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;flex:none;
+  background:color-mix(in srgb,var(--flat) 14%,transparent);color:var(--flat)}
+.arrow svg{width:34px;height:34px}
+.up .arrow{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.down .arrow{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
+.verdict-text{min-width:0}
+.big{font-size:30px;font-weight:800;line-height:1.1;letter-spacing:-.02em}
+.up .big{color:var(--up)} .down .big{color:var(--down)}
+.sub{color:var(--muted);font-size:14px}
+.meter{height:10px;border-radius:5px;background:linear-gradient(90deg,var(--down),var(--line) 50%,var(--up));position:relative}
+.meter i{position:absolute;top:-4px;width:4px;height:18px;border-radius:2px;background:var(--fg);transform:translateX(-50%);transition:left .4s}
+.meter b{position:absolute;top:-2px;height:14px;border-left:1px dashed var(--muted);border-right:1px dashed var(--muted);background:color-mix(in srgb,var(--surface) 55%,transparent)}
+.meter-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px}
+button{font:700 16px var(--display);border:0;border-radius:10px;padding:14px 18px;cursor:pointer;background:var(--accent);color:var(--on-accent);width:100%}
+button:focus-visible,.seg button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+button[disabled]{opacity:.6;cursor:wait}
+.seg-row{display:flex;flex-direction:column;gap:6px}
+.seg-row label{font-size:13px;font-weight:700}
+.seg{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{background:transparent;color:var(--fg);font:600 13px var(--mono);padding:8px 2px;border-radius:7px}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--surface)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat b{font:600 22px var(--mono);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted);line-height:1.3}
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.gauge{display:flex;flex-direction:column;gap:6px;min-width:0}
+.gauge .bar{height:8px;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.gauge .bar span{position:absolute;top:0;bottom:0}
+.gauge .val{font:600 18px var(--mono)}
+.gauge .lbl{font-size:12px;color:var(--muted);line-height:1.3}
+.strip{display:flex;flex-wrap:wrap;gap:3px;margin-top:14px}
+.strip i{width:10px;height:10px;border-radius:2px;background:var(--line)}
+.strip i.ok{background:var(--up)} .strip i.bad{background:var(--down)} .strip i.skip{background:transparent;border:1px solid var(--line)}
+.legend{font-size:12px;color:var(--muted);margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:12px}
+td.r,th.r{text-align:right}
+tr.sel td{font-weight:700}
+.table-wrap{overflow-x:auto}
+.note{font-size:13px;color:var(--muted)}
+.warn{border-left:3px solid var(--accent);padding:10px 12px;background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:6px;font-size:13px}
+.err{color:var(--down);font-size:14px}
+details summary{cursor:pointer;font-weight:700}
+.ok-t{color:var(--up)} .bad-t{color:var(--down)}
+.src{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.src span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--muted)}
+.src span.on{color:var(--fg);border-color:color-mix(in srgb,var(--up) 50%,var(--line))}
+.src span.off{text-decoration:line-through}
+.err-box{font-size:13px;border:1px solid color-mix(in srgb,var(--down) 45%,var(--line));background:color-mix(in srgb,var(--down) 7%,transparent);border-radius:8px;padding:10px 12px}
+.err-box ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.err-box li{overflow-wrap:anywhere}
+@media (max-width:400px){.big{font-size:26px}.flow{grid-template-columns:1fr}.stat b{font-size:19px}}
+@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>BTC <span>Next 15</span></h1>
+    <div class="price mono" id="price">Loading price…</div>
+  </header>
+
+  <section class="card call" aria-live="polite">
+    <div class="verdict" id="verdict">
+      <div class="arrow" id="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg></div>
+      <div class="verdict-text">
+        <div class="big" id="bigText">Checking…</div>
+        <div class="sub" id="subText">Downloading about 90 days of 15-minute candles. The first time takes 10 to 20 seconds.</div>
+      </div>
+    </div>
+    <div>
+      <div class="meter"><b id="noZone"></b><i id="needle" style="left:50%"></i></div>
+      <div class="meter-labels"><span>More likely down</span><span id="probText" class="mono">Up 50%</span><span>More likely up</span></div>
+    </div>
+    <div class="seg-row">
+      <label id="thLabel">Only make a call when the model is at least this sure</label>
+      <div class="seg" role="group" aria-labelledby="thLabel" id="thSeg">
+        <button type="button" data-th="0.5" id="th50">Any</button>
+        <button type="button" data-th="0.52" id="th52">52%</button>
+        <button type="button" data-th="0.55" id="th55">55%</button>
+        <button type="button" data-th="0.58" id="th58">58%</button>
+        <button type="button" data-th="0.6" id="th60">60%</button>
+      </div>
+    </div>
+    <button id="ask" type="button">Ask again</button>
+    <div class="note" id="dataNote"></div>
+    <div class="src" id="srcChips"></div>
+    <div class="err-box" id="errBox" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2>Live order flow</h2>
+    <div class="flow">
+      <div class="gauge"><div class="val" id="bookVal">–</div><div class="bar"><span id="bookBar"></span></div><div class="lbl">Order book: buy vs. sell orders resting within 0.1% of the price</div></div>
+      <div class="gauge"><div class="val" id="tapeVal">–</div><div class="bar"><span id="tapeBar"></span></div><div class="lbl">Trades in the last 5 minutes: buyers vs. sellers hitting the market</div></div>
+    </div>
+    <p class="note" id="flowNote">Free exchanges don't publish order-book history, so this panel is shown next to the call rather than mixed into it. Each reading is saved with your calls so you can see later whether it helped.</p>
+  </section>
+
+  <section class="card">
+    <h2>Out-of-sample test</h2>
+    <p class="note" style="margin-top:0" id="oosIntro">Each day of the test period, the model is retrained using only the data before that day, then judged on what actually happened.</p>
+    <div class="stats">
+      <div class="stat"><b id="sHit">–</b><span id="sHitLbl">right when it made a call</span></div>
+      <div class="stat"><b id="sCov">–</b><span>of the time it made a call</span></div>
+      <div class="stat"><b id="sBase">–</b><span>"always guess up" for comparison</span></div>
+    </div>
+    <div class="strip" id="strip"></div>
+    <div class="legend">The last 96 test candles (one day), oldest first. Green right, red wrong, hollow no call.</div>
+    <div class="table-wrap" style="margin-top:14px">
+      <table><thead><tr><th>Call only when at least</th><th class="r">Calls</th><th class="r">How often</th><th class="r">Right</th><th class="r">Luck range</th></tr></thead><tbody id="thBody"></tbody></table>
+    </div>
+    <p class="note" id="btNote"></p>
+  </section>
+
+  <section class="card">
+    <h2>Your track record</h2>
+    <p class="note" style="margin-top:0">Every time you ask, the call and the order-flow readings are saved in this browser and checked 15 minutes later against the real price.</p>
+    <div class="table-wrap"><table><thead><tr><th>Asked</th><th>Call</th><th class="r">Price then</th><th class="r">15 min later</th><th>Result</th></tr></thead><tbody id="histBody"></tbody></table></div>
+    <p class="note" id="histSummary"></p>
+  </section>
+
+  <div class="warn"><b>Not financial advice.</b> Nobody can reliably predict where Bitcoin goes in 15 minutes. Short-term moves are mostly noise, and even good signals are right only a little more than half the time. Use this as a curiosity, not a reason to trade. Fees and slippage would wipe out a small edge.</div>
+
+  <details class="card">
+    <summary>How it works</summary>
+    <p class="note">It downloads about 90 days of 15-minute BTC-USD candles from Coinbase (Binance.US, then Binance, are the backups). Coinbase candles don't split buyers from sellers, so that share comes from Binance.US for the same 15 minutes. When reachable, it also pulls perpetual-futures funding rates (OKX or Binance) and the Binance futures premium over spot. Each source that fails is skipped and listed on the page.</p>
+    <p class="note">For every candle it measures momentum over 15 minutes, 1 hour and 4 hours, RSI, a short vs. long moving-average gap, where the price sits in its recent range, volume spikes, time of day, and trade flow (the share of volume from buyers hitting the market). With futures data it adds the funding rate and the futures premium. A logistic-regression model learns from the last 60 days how those relate to the next candle going up or down.</p>
+    <p class="note">The out-of-sample test covers the most recent 30 days. The model is never shown the day it is judged on. The "luck range" is where a pure coin flip would land 95% of the time with that many calls. A hit rate inside it is not evidence of a real edge.</p>
+  </details>
+</main>
+
+<script id="model">
+// ---------- pure model code (no DOM) ----------
+const M = {};
+M.Q = 900000; // 15 minutes in ms
+M.ema = (xs, n) => { const k = 2/(n+1); const out = []; let e = xs[0]; for (const x of xs){ e = x*k + e*(1-k); out.push(e);} return out; };
+M.rsi = (closes, n=14) => {
+  const out = new Array(closes.length).fill(50); let g=0,l=0;
+  for (let i=1;i<closes.length;i++){
+    const d = closes[i]-closes[i-1], up = Math.max(d,0), dn = Math.max(-d,0);
+    if (i<=n){ g+=up/n; l+=dn/n; } else { g=(g*(n-1)+up)/n; l=(l*(n-1)+dn)/n; }
+    out[i] = l===0 ? 100 : 100 - 100/(1+g/l);
+  }
+  return out;
+};
+M.WARM = 30;
+// cs: [{t,o,h,l,c,v,tb}] oldest first (tb = taker-buy volume, may be null).
+// ctx: {funding:[{t,r}] sorted, premium: Map(openTime -> premium close)} — either may be null.
+M.features = (cs, ctx={}) => {
+  const c = cs.map(x=>x.c), e9 = M.ema(c,9), e21 = M.ema(c,21), r = M.rsi(c,14);
+  const hasTaker = cs.every(k=>k.tb!=null);
+  const fund = ctx.funding && ctx.funding.length ? ctx.funding : null;
+  const prem = ctx.premium && ctx.premium.size ? ctx.premium : null;
+  const names = ["15m move","1h move","4h move","RSI","MA gap","Range position","Volume spike","Hour (sin)","Hour (cos)"];
+  if (hasTaker) names.push("Trade flow 15m","Trade flow 1h");
+  if (fund) names.push("Funding rate");
+  if (prem) names.push("Futures premium","Premium change 1h");
+  const rows = []; let fi = 0, lastPrem = 0; const premHist = [];
+  for (let i=0;i<cs.length;i++){
+    const closeT = cs[i].t + M.Q;
+    let pv = lastPrem;
+    if (prem){ const x = prem.get(cs[i].t); if (x!=null) pv = x; lastPrem = pv; premHist.push(pv); }
+    if (fund) while (fi+1 < fund.length && fund[fi+1].t <= closeT) fi++;
+    if (i < M.WARM){ rows.push(null); continue; }
+    const lr = (a,b)=>Math.log(c[a]/c[b]);
+    let hi=-Infinity, lo=Infinity, vs=0, s1=0, s2=0;
+    for (let j=i-19;j<=i;j++){ hi=Math.max(hi,cs[j].h); lo=Math.min(lo,cs[j].l); vs+=cs[j].v; const x=lr(j,j-1); s1+=x; s2+=x*x; }
+    const vol = Math.sqrt(Math.max(s2/20-(s1/20)**2,0)) || 1e-6;
+    const r1 = lr(i,i-1), hr = new Date(cs[i].t).getUTCHours() + new Date(cs[i].t).getUTCMinutes()/60;
+    const row = [
+      r1/vol, lr(i,i-4)/(vol*2), lr(i,i-16)/(vol*4), (r[i]-50)/50, (e9[i]/e21[i]-1)/vol,
+      hi>lo ? (c[i]-lo)/(hi-lo)-0.5 : 0,
+      Math.log((cs[i].v+1e-9)/(vs/20+1e-9))*Math.sign(r1),
+      Math.sin(2*Math.PI*hr/24), Math.cos(2*Math.PI*hr/24)
+    ];
+    if (hasTaker){
+      row.push(cs[i].v>0 ? 2*cs[i].tb/cs[i].v-1 : 0);
+      let tb=0,v=0; for (let j=i-3;j<=i;j++){ tb+=cs[j].tb; v+=cs[j].v; } row.push(v>0 ? 2*tb/v-1 : 0);
+    }
+    if (fund) row.push(fund[fi].t <= closeT ? fund[fi].r*1e4 : 0);
+    if (prem){ row.push(pv*1e4); row.push((pv - (premHist[i-4] ?? pv))*1e4); }
+    rows.push(row);
+  }
+  return { rows, names };
+};
+M.train = (X, y, {l2=0.02, iters=200, lr=0.5}={}) => {
+  const d = X[0].length, n = X.length, mu = new Float64Array(d), sd = new Float64Array(d);
+  for (const x of X) for (let j=0;j<d;j++) mu[j]+=x[j]/n;
+  for (const x of X) for (let j=0;j<d;j++) sd[j]+=(x[j]-mu[j])**2/n;
+  for (let j=0;j<d;j++) sd[j]=Math.sqrt(sd[j])||1;
+  const clip = (v)=> v>4?4:v<-4?-4:v;
+  const Z = new Float64Array(n*d);
+  for (let i=0;i<n;i++) for (let j=0;j<d;j++) Z[i*d+j] = clip((X[i][j]-mu[j])/sd[j]);
+  const w = new Float64Array(d); let b = 0; const gw = new Float64Array(d);
+  for (let it=0; it<iters; it++){
+    gw.fill(0); let gb = 0;
+    for (let i=0;i<n;i++){
+      let s=b; const o=i*d; for (let j=0;j<d;j++) s+=w[j]*Z[o+j];
+      const e = 1/(1+Math.exp(-s)) - y[i];
+      for (let j=0;j<d;j++) gw[j]+=e*Z[o+j]; gb+=e;
+    }
+    for (let j=0;j<d;j++) w[j]-=lr*(gw[j]/n+l2*w[j]);
+    b -= lr*gb/n;
+  }
+  return { w:[...w], b, predict:(x)=>{ let s=b; for (let j=0;j<d;j++) s+=w[j]*clip((x[j]-mu[j])/sd[j]); return 1/(1+Math.exp(-s)); } };
+};
+M.windowSizes = (n) => { const test = Math.min(2880, Math.floor(n/3)); return { test, train: Math.min(5760, n - test - M.WARM - 1) }; };
+M.trainAt = (F, cs, i, trainN) => {
+  const X=[], y=[];
+  for (let k=Math.max(M.WARM, i-trainN); k<i; k++){ X.push(F[k]); y.push(cs[k+1].c>cs[k].c?1:0); }
+  return M.train(X,y);
+};
+M.label = (p, th) => {
+  const conf = Math.max(p,1-p), dir = p>=0.5 ? "up" : "down";
+  if (conf < Math.max(th, 0.5000001)) return { dir:"flat", word:"No call", conf };
+  return { dir, word:(conf>=0.6?"Likely ":"Leaning ")+dir, conf };
+};
+// Walk-forward out-of-sample test over completed candles: retrain once a day on the prior window only.
+M.backtest = async (cs, ctx, {retrainEvery=96, onProgress}={}) => {
+  const { rows:F } = M.features(cs, ctx), { test, train } = M.windowSizes(cs.length);
+  const lastIdx = cs.length-2, start = lastIdx - test + 1, out = [];
+  let model = null;
+  for (let i=start; i<=lastIdx; i++){
+    if ((i-start)%retrainEvery===0){
+      model = M.trainAt(F, cs, i, train);
+      if (onProgress){ onProgress((i-start)/test); await new Promise(r=>setTimeout(r,0)); }
+    }
+    out.push({ t: cs[i].t, p: model.predict(F[i]), up: cs[i+1].c > cs[i].c });
+  }
+  return { rows: out, test, train };
+};
+M.score = (rows, th) => {
+  const called = rows.filter(r=>Math.max(r.p,1-r.p) >= Math.max(th,0.5000001) || th<=0.5);
+  const right = called.filter(r=>(r.p>=0.5)===r.up).length;
+  const luck = called.length ? 1.96*Math.sqrt(0.25/called.length) : 0.5;
+  return { n: rows.length, calls: called.length, coverage: called.length/rows.length, acc: called.length ? right/called.length : NaN,
+           luck, upRate: rows.filter(r=>r.up).length/rows.length };
+};
+M.liveCall = (cs, ctx) => {
+  // cs ends with the in-progress candle (its c = latest price).
+  // Train only on labels from completed candles (k+1 <= i-1), using up to 60 days.
+  const { rows:F, names } = M.features(cs, ctx), i = cs.length-1;
+  const model = M.trainAt(F, cs, i-1, Math.min(5760, i-1-M.WARM));
+  return { p: model.predict(F[i]), names, w: model.w };
+};
+if (typeof module !== "undefined") module.exports = M;
+</script>
+
+<script>
+// ---------- data + UI ----------
+const $ = (id)=>document.getElementById(id);
+const fmtUsd = (x)=> "$" + x.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = (x,d=1)=> isNaN(x) ? "–" : (x*100).toFixed(d)+"%";
+const fmtTime = (ms)=> new Date(ms).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+const fmtDay = (ms)=> new Date(ms).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+const STORE = "btc-next15-history-v1", TH_STORE = "btc-next15-threshold";
+const loadHist = ()=>{ try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
+const saveHist = (h)=>{ try { localStorage.setItem(STORE, JSON.stringify(h.slice(-300))); } catch {} };
+let TH = 0.55; try { const v = parseFloat(localStorage.getItem(TH_STORE)); if (v>=0.5 && v<=0.6) TH = v; } catch {}
+
+const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+const iso = (ms)=>new Date(ms).toISOString();
+const CB = "https://api.exchange.coinbase.com", BUS = "https://api.binance.us/api/v3", BV = "https://data-api.binance.vision/api/v3", FAPI = "https://fapi.binance.com/fapi/v1";
+
+// One fetch with a timeout and a few retries. Errors name the site and what went wrong.
+async function getJSON(url, {timeout=10000, tries=3}={}){
+  const host = url.split("/")[2];
+  for (let a=1;;a++){
+    const ctl = new AbortController(), timer = setTimeout(()=>ctl.abort(), timeout);
+    let err;
+    try {
+      const r = await fetch(url, {cache:"no-store", signal: ctl.signal});
+      if (r.ok) return await r.json();
+      err = new Error(`${host} answered ${r.status}${r.status===451||r.status===403?" (blocked in your region)":r.status===429?" (too many requests)":""}`);
+      err.retry = r.status===429 || r.status>=500;
+    } catch (e) {
+      err = e.name==="AbortError" ? new Error(`${host} didn't answer within ${timeout/1000}s`) : new Error(`couldn't connect to ${host}`);
+      err.retry = true; err.network = e.name!=="AbortError";
+    } finally { clearTimeout(timer); }
+    if (a>=tries || !err.retry) throw err;
+    await sleep(700*a);
+  }
+}
+
+// Status of every source, shown on the page.
+const SOURCES = { candles:"Price history", flowHist:"Trade flow history", funding:"Funding rate", premium:"Futures premium", live:"Live order book", check:"15-minute check" };
+const status = {};
+const setStatus = (key, ok, detail) => { status[key] = { ok, detail }; renderStatus(); };
+
+// Candle cache so repeat asks only download what's new.
+const CACHE = "btc-next15-candles-v2";
+function loadCache(src){ try { const j = JSON.parse(localStorage.getItem(CACHE)); return j && j.src===src ? j.cs : []; } catch { return []; } }
+function saveCache(src, cs){ try { localStorage.setItem(CACHE, JSON.stringify({src, cs: cs.slice(-8800)})); } catch {} }
+function contiguousTail(cs, step){
+  let i = cs.length-1; while (i>0 && cs[i].t - cs[i-1].t <= step*8) i--;
+  return cs.slice(i);
+}
+
+// Coinbase Exchange: 300 candles per call, newest first: [time, low, high, open, close, volume].
+async function coinbaseCandles(granSec, days, progress, useCache=true){
+  const step = granSec*1000, now = Date.now(), from = now - days*864e5;
+  const cached = useCache ? loadCache("coinbase").filter(k=>k.t>=from) : [];
+  const have = new Map(cached.map(k=>[k.t,k]));
+  const fetchFrom = cached.length && now - cached[cached.length-1].t < 3*864e5 ? cached[cached.length-1].t - 2*step : from;
+  const windows = []; for (let e=now; e>fetchFrom; e-=300*step) windows.push([Math.max(fetchFrom, e-299*step), e]);
+  let done = 0, failed = 0, lastErr = null;
+  // Try the newest page first, so a blocked or offline Coinbase fails fast instead of after every page.
+  if (windows.length){ const [s,e] = windows.shift(); const rows = await getJSON(`${CB}/products/BTC-USD/candles?granularity=${granSec}&start=${iso(s)}&end=${iso(e)}`, {tries:2});
+    for (const [t,l,h,o,c,v] of rows) have.set(t*1000, {t:t*1000,o,h,l,c,v,tb:null}); done++; }
+  for (let i=0;i<windows.length;i+=4){
+    await Promise.all(windows.slice(i,i+4).map(async ([s,e])=>{
+      try {
+        const rows = await getJSON(`${CB}/products/BTC-USD/candles?granularity=${granSec}&start=${iso(s)}&end=${iso(e)}`);
+        for (const [t,l,h,o,c,v] of rows) have.set(t*1000, {t:t*1000,o,h,l,c,v,tb:null});
+      } catch (err) { failed++; lastErr = err; }
+      if (progress) progress(`Downloading Coinbase candles… ${++done} of ${windows.length+1}`);
+    }));
+    if (i+4 < windows.length) await sleep(300); // stay under Coinbase's public rate limit
+  }
+  const cs = contiguousTail([...have.values()].sort((a,b)=>a.t-b.t), step);
+  if (cs.length < (granSec===900 ? 500 : 20)) throw lastErr || new Error("Coinbase returned too little data");
+  if (useCache) saveCache("coinbase", cs);
+  return { cs, failed };
+}
+// Binance-style klines (Binance.US or Binance's public mirror): [openTime,o,h,l,c,v,closeTime,quoteVol,trades,takerBuyBase,...]
+async function binanceKlines(base, interval, days){
+  const step = interval==="1m" ? 60000 : M.Q, now = Date.now(), from = now - days*864e5, calls = [];
+  for (let s = from; s < now; s += 1000*step) calls.push(getJSON(`${base}/klines?symbol=BTCUSDT&interval=${interval}&startTime=${Math.floor(s)}&limit=1000`));
+  const map = new Map();
+  for (const rows of await Promise.all(calls)) for (const r of rows) map.set(r[0], {t:r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5],tb:+r[9]});
+  const cs = contiguousTail([...map.values()].sort((a,b)=>a.t-b.t), step);
+  if (cs.length < (interval==="1m" ? 20 : 500)) throw new Error(`${base.split("/")[2]} returned too little data`);
+  return cs;
+}
+
+async function getCandles(progress){
+  const errs = [];
+  try {
+    const { cs, failed } = await coinbaseCandles(900, 90, progress);
+    setStatus("candles", true, `Coinbase BTC-USD, ${Math.round(cs.length/96)} days` + (failed ? ` (${failed} pages missing)` : ""));
+    return { cs, src:"coinbase" };
+  } catch (e) { errs.push("Coinbase: " + e.message); }
+  for (const [name, base, key] of [["Binance.US", BUS, "binanceus"], ["Binance", BV, "binance"]]){
+    try {
+      progress(`Coinbase didn't work. Trying ${name}…`);
+      const cs = await binanceKlines(base, "15m", 90);
+      setStatus("candles", true, `${name} BTC-USDT, ${Math.round(cs.length/96)} days. Coinbase failed: ${errs[0]}`);
+      return { cs, src:key };
+    } catch (e) { errs.push(`${name}: ${e.message}`); }
+  }
+  setStatus("candles", false, errs.join("; "));
+  const err = new Error("Couldn't download price history from any exchange. " + errs.join(". ") + ".");
+  err.allNetwork = errs.every(x=>/couldn't connect/.test(x));
+  throw err;
+}
+// Coinbase candles have no buyer/seller split, so borrow the buy share from Binance.US (or Binance) for the same 15 minutes.
+async function addTradeFlow(cs, src){
+  if (cs.every(k=>k.tb!=null)){ setStatus("flowHist", true, "From the same exchange's candles"); return cs; }
+  const errs = [], days = Math.ceil((Date.now()-cs[0].t)/864e5);
+  for (const [name, base] of [["Binance.US", BUS], ["Binance", BV]]){
+    try {
+      const k = await binanceKlines(base, "15m", days), m = new Map(k.map(x=>[x.t, x.v>0 ? x.tb/x.v : null]));
+      const hits = cs.filter(x=>m.get(x.t)!=null).length;
+      if (hits < cs.length*0.8) throw new Error(`only covered ${Math.round(hits/cs.length*100)}% of candles`);
+      setStatus("flowHist", true, `Buy/sell share from ${name}`);
+      return cs.map(x=>({...x, tb: x.v*(m.get(x.t) ?? 0.5)}));
+    } catch (e) { errs.push(`${name}: ${e.message}`); }
+  }
+  setStatus("flowHist", false, errs.join("; "));
+  return cs;
+}
+async function getFunding(days){
+  const start = Date.now() - days*864e5, errs = [];
+  try {
+    const out = []; let after = "";
+    for (let k=0;k<4;k++){
+      const j = await getJSON(`https://www.okx.com/api/v5/public/funding-rate-history?instId=BTC-USDT-SWAP&limit=100${after?"&after="+after:""}`, {timeout:6000, tries:1});
+      const d = j.data || []; if (!d.length) break;
+      for (const r of d) out.push({t:+r.fundingTime, r:+(r.realizedRate||r.fundingRate)});
+      after = d[d.length-1].fundingTime; if (+after < start) break;
+    }
+    if (!out.length) throw new Error("returned no data");
+    setStatus("funding", true, "OKX perpetual"); return out.sort((a,b)=>a.t-b.t);
+  } catch (e) { errs.push("OKX: " + e.message); }
+  try {
+    const rows = await getJSON(`${FAPI}/fundingRate?symbol=BTCUSDT&startTime=${start}&limit=1000`, {timeout:6000, tries:1});
+    setStatus("funding", true, "Binance futures"); return rows.map(r=>({t:+r.fundingTime, r:+r.fundingRate})).sort((a,b)=>a.t-b.t);
+  } catch (e) { errs.push("Binance futures: " + e.message); }
+  setStatus("funding", false, errs.join("; ")); return null;
+}
+async function getPremium(days, n){
+  try {
+    const now = Date.now(), calls = [];
+    for (let s = now - days*864e5; s < now; s += 1500*M.Q) calls.push(getJSON(`${FAPI}/premiumIndexKlines?symbol=BTCUSDT&interval=15m&startTime=${Math.floor(s)}&limit=1500`, {timeout:6000, tries:1}));
+    const map = new Map(); for (const rows of await Promise.all(calls)) for (const r of rows) map.set(r[0], +r[4]);
+    if (map.size < n*0.8) throw new Error("returned too little data");
+    setStatus("premium", true, "Binance futures"); return map;
+  } catch (e) { setStatus("premium", false, "Binance futures: " + e.message + ". Only Binance publishes this for free, and it's blocked in the US."); return null; }
+}
+function flowFrom(bids, asks, buy, sell){
+  const mid = (bids[0][0]+asks[0][0])/2;
+  const B = bids.filter(([p])=>p >= mid*0.999).reduce((a,[,q])=>a+q,0), A = asks.filter(([p])=>p <= mid*1.001).reduce((a,[,q])=>a+q,0);
+  return { book: (B+A) ? (B-A)/(B+A) : 0, tape: (buy+sell) ? (buy-sell)/(buy+sell) : 0, bookBtc:[B,A], tapeBtc:[buy,sell] };
+}
+async function liveFlow(){
+  const since = Date.now()-5*60000, errs = [];
+  try {
+    const [book, trades] = await Promise.all([getJSON(`${CB}/products/BTC-USD/book?level=2`, {timeout:8000, tries:2}), getJSON(`${CB}/products/BTC-USD/trades?limit=1000`, {timeout:8000, tries:2})]);
+    let buy=0, sell=0; for (const t of trades) if (Date.parse(t.time) >= since) (t.side==="sell" ? (buy += +t.size) : (sell += +t.size)); // Coinbase side = resting order's side
+    setStatus("live", true, "Coinbase");
+    return { ...flowFrom(book.bids.map(([p,q])=>[+p,+q]), book.asks.map(([p,q])=>[+p,+q]), buy, sell), src:"Coinbase" };
+  } catch (e) { errs.push("Coinbase: " + e.message); }
+  for (const [name, base] of [["Binance.US", BUS], ["Binance", BV]]){
+    try {
+      const [book, trades] = await Promise.all([getJSON(`${base}/depth?symbol=BTCUSDT&limit=500`, {timeout:8000, tries:1}), getJSON(`${base}/aggTrades?symbol=BTCUSDT&limit=1000`, {timeout:8000, tries:1})]);
+      let buy=0, sell=0; for (const t of trades) if (t.T >= since) (t.m ? (sell += +t.q) : (buy += +t.q));
+      setStatus("live", true, name);
+      return { ...flowFrom(book.bids.map(([p,q])=>[+p,+q]), book.asks.map(([p,q])=>[+p,+q]), buy, sell), src:name };
+    } catch (e) { errs.push(`${name}: ${e.message}`); }
+  }
+  setStatus("live", false, errs.join("; ")); return null;
+}
+async function oneMinuteCandles(){
+  try { return (await coinbaseCandles(60, 300/1440, null, false)).cs; } catch {}
+  for (const base of [BUS, BV]) { try { return await binanceKlines(base, "1m", 0.7); } catch {} }
+  setStatus("check", false, "Couldn't download 1-minute prices to check earlier calls. They'll be checked next time.");
+  return [];
+}
+
+const ARROWS = {
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  flat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>'
+};
+
+let state = null; // {live, price, src, closedN, bt, flow, ctx, fundSrc, askedAt}
+
+function renderCall(){
+  if (!state) return;
+  const { live, price, askedAt } = state, p = live.p, lab = M.label(p, TH);
+  $("verdict").className = "verdict " + lab.dir;
+  $("arrow").innerHTML = ARROWS[lab.dir];
+  $("bigText").textContent = lab.word;
+  const target = new Date(askedAt + 15*60000);
+  $("subText").textContent = lab.dir==="flat"
+    ? `The model leans ${p>=0.5?"up":"down"} at ${fmtPct(lab.conf,0)}, below your ${TH>0.5?fmtPct(TH,0):"any"} bar. Sitting this one out (next 15 min, until ${fmtTime(target)}).`
+    : `${fmtPct(lab.conf,0)} chance it's ${lab.dir==="up"?"higher":"lower"} than ${fmtUsd(price)} at ${fmtTime(target)}.`;
+  $("needle").style.left = (p*100).toFixed(1)+"%";
+  const z = $("noZone"); z.style.left = ((1-TH)*100)+"%"; z.style.width = ((2*TH-1)*100)+"%"; z.hidden = TH<=0.5;
+  $("probText").textContent = "Up " + fmtPct(p,0);
+}
+
+function renderStatus(){
+  const keys = Object.keys(SOURCES).filter(k=>status[k] && (k!=="check" || !status[k].ok));
+  $("srcChips").innerHTML = keys.map(k=>`<span class="${status[k].ok?"on":"off"}">${SOURCES[k]}</span>`).join("");
+  const bad = keys.filter(k=>!status[k].ok), used = keys.filter(k=>status[k].ok);
+  const box = $("errBox");
+  box.hidden = !bad.length;
+  box.innerHTML = bad.length ? "<b>Couldn't use:</b><ul>" + bad.map(k=>`<li><b></b> <span></span></li>`).join("") + "</ul>" : "";
+  [...box.querySelectorAll("li")].forEach((li,i)=>{ li.firstChild.textContent = SOURCES[bad[i]] + ":"; li.lastChild.textContent = status[bad[i]].detail; });
+  $("dataNote").textContent = (state ? `Updated ${fmtTime(state.askedAt)}. ` : "") + (used.length ? "Using: " + used.map(k=>`${SOURCES[k]} (${status[k].detail})`).join("; ") + "." : "");
+}
+
+function setGauge(id, v){
+  const bar = $(id+"Bar"), val = $(id+"Val");
+  if (v==null){ val.textContent = "Unavailable"; bar.style.cssText=""; return; }
+  const pct = Math.abs(v)*50;
+  bar.style.cssText = v>=0 ? `left:50%;width:${pct}%;background:var(--up)` : `left:${50-pct}%;width:${pct}%;background:var(--down)`;
+  val.textContent = (v>=0?"Buyers +":"Sellers +") + Math.round(Math.abs(v)*100) + "%";
+  val.style.color = v>=0 ? "var(--up)" : "var(--down)";
+}
+function renderFlow(){
+  const f = state.flow;
+  setGauge("book", f ? f.book : null); setGauge("tape", f ? f.tape : null);
+  if (f) $("flowNote").textContent = `Within 0.1% of the price: ${f.bookBtc[0].toFixed(1)} BTC of buy orders vs. ${f.bookBtc[1].toFixed(1)} BTC of sell orders. Last 5 minutes: ${f.tapeBtc[0].toFixed(1)} BTC bought at market vs. ${f.tapeBtc[1].toFixed(1)} BTC sold. Free exchanges don't publish order-book history, so this isn't in the model. It's saved with each call so your track record can show whether it helped.`;
+}
+
+function renderBacktest(){
+  const { bt } = state, rows = bt.rows, s = M.score(rows, TH), days = (rows.length/96).toFixed(0);
+  $("oosIntro").textContent = `Covers the last ${days} days. Each day, the model is retrained on the ${Math.round(bt.train/96)} days before it only, then judged on what actually happened.`;
+  $("sHit").textContent = fmtPct(s.acc);
+  $("sCov").textContent = fmtPct(s.coverage,0);
+  $("sBase").textContent = fmtPct(s.upRate);
+  $("sHitLbl").textContent = TH>0.5 ? `right when at least ${fmtPct(TH,0)} sure` : "right on every candle";
+  $("strip").innerHTML = rows.slice(-96).map(r=>{
+    const called = TH<=0.5 || Math.max(r.p,1-r.p) >= TH;
+    return `<i class="${!called?"skip":(r.p>=0.5)===r.up?"ok":"bad"}"></i>`;
+  }).join("");
+  $("thBody").innerHTML = [0.5,0.52,0.55,0.58,0.6].map(th=>{
+    const x = M.score(rows, th);
+    return `<tr class="${th===TH?"sel":""}"><td>${th===0.5?"Always":fmtPct(th,0)}</td><td class="r mono">${x.calls}</td><td class="r mono">${fmtPct(x.coverage,0)}</td><td class="r mono">${fmtPct(x.acc)}</td><td class="r mono">${x.calls?fmtPct(Math.max(0,0.5-x.luck),0)+"–"+fmtPct(Math.min(1,0.5+x.luck),0):"–"}</td></tr>`;
+  }).join("");
+  let verdict;
+  if (!s.calls) verdict = "At this setting it made no calls at all in the test period. Lower the bar to see results.";
+  else if (Math.abs(s.acc-0.5) < s.luck) verdict = `${fmtPct(s.acc)} is inside the luck range (${fmtPct(0.5-s.luck,0)}–${fmtPct(0.5+s.luck,0)}) for ${s.calls} calls, so there's no real evidence of an edge at this setting.`;
+  else if (s.acc > 0.5) verdict = `${fmtPct(s.acc)} is above the luck range for ${s.calls} calls. That's some evidence of an edge over this stretch, though edges like this tend to fade and fees would eat most of it.`;
+  else verdict = `${fmtPct(s.acc)} is below the luck range. At this setting it has done worse than a coin flip, so don't rely on it.`;
+  $("btNote").textContent = verdict + " Pick the setting by its call count too: a high hit rate on a handful of calls means little.";
+}
+
+function priceAt(ms, minute){
+  let best = null;
+  for (const k of minute){ if (k.t + 60000 <= ms + 1000) best = k; else break; }
+  return best && ms - (best.t+60000) < 3*60000 ? best.c : null;
+}
+function renderHistory(hist){
+  const rows = hist.slice().reverse().slice(0, 20);
+  $("histBody").innerHTML = rows.length ? rows.map(h=>{
+    let res = "Waiting";
+    if (h.right === true) res = '<span class="ok-t">Right</span>';
+    else if (h.right === false) res = '<span class="bad-t">Wrong</span>';
+    else if (h.dir === "flat" && h.later != null) res = "No call";
+    else if (h.expired) res = "Couldn't check";
+    return `<tr><td>${fmtDay(h.t)}</td><td>${h.word}</td><td class="r mono">${fmtUsd(h.price)}</td><td class="r mono">${h.later!=null?fmtUsd(h.later):"–"}</td><td>${res}</td></tr>`;
+  }).join("") : `<tr><td colspan="5" class="note">No calls yet. Your first one is saved when the page finishes loading.</td></tr>`;
+  const done = hist.filter(h=>h.right===true||h.right===false);
+  let txt = done.length ? `Right ${done.filter(h=>h.right).length} of ${done.length} checked calls (${fmtPct(done.filter(h=>h.right).length/done.length)}).` : "";
+  const withFlow = hist.filter(h=>h.later!=null && h.flow && Math.abs(h.flow.book) > 0.2);
+  if (withFlow.length >= 5){
+    const agree = withFlow.filter(h=>(h.flow.book>0)===(h.later>h.price)).length;
+    txt += ` When the order book leaned clearly one way, the price followed it ${agree} of ${withFlow.length} times.`;
+  }
+  $("histSummary").textContent = txt;
+}
+async function resolveHistory(hist){
+  const pending = hist.filter(h=>h.later==null && !h.expired && Date.now() >= h.t + 15*60000);
+  if (!pending.length) return hist;
+  const minute = await oneMinuteCandles();
+  for (const h of pending){
+    const later = priceAt(h.t + 15*60000, minute);
+    if (later != null){ h.later = later; h.right = h.dir==="flat" ? null : (h.dir==="up") === (later > h.price); }
+    else if (Date.now() - h.t > 4*3600000) h.expired = true;
+  }
+  saveHist(hist);
+  return hist;
+}
+
+function setTH(v){
+  TH = v; try { localStorage.setItem(TH_STORE, String(v)); } catch {}
+  for (const b of $("thSeg").querySelectorAll("button")) b.setAttribute("aria-pressed", String(+b.dataset.th===v));
+  if (state){ renderCall(); renderBacktest(); }
+}
+$("thSeg").addEventListener("click", e=>{ const b = e.target.closest("button[data-th]"); if (b) setTH(+b.dataset.th); });
+
+let busy = false, nextCheck = null;
+async function ask(){
+  if (busy) return; busy = true; $("ask").disabled = true; $("ask").textContent = "Checking…";
+  const progress = (t)=>{ $("ask").textContent = t.length < 46 ? t : "Checking…"; if (!state) $("subText").textContent = t; };
+  try {
+    let { cs, src } = await getCandles(progress);
+    const days = Math.ceil((Date.now()-cs[0].t)/864e5);
+    progress("Checking trade flow, futures and the order book…");
+    const [csFlow, funding, premium, flow] = await Promise.all([addTradeFlow(cs, src), getFunding(days+2), getPremium(days, cs.length), liveFlow()]);
+    cs = csFlow;
+    const ctx = { funding, premium };
+    const now = Date.now(), closed = cs.filter(k => k.t + M.Q <= now), cur = cs.find(k => k.t + M.Q > now);
+    const price = cur ? cur.c : closed[closed.length-1].c;
+    $("price").textContent = "BTC " + fmtUsd(price);
+    const base = cur || { t: closed[closed.length-1].t + M.Q, o: price, h: price, l: price, c: price, v: 0, tb: closed[0].tb==null?null:0 };
+    const frac = Math.min(1, Math.max(0.1, (now - base.t)/M.Q));
+    const liveCandle = { ...base, v: base.v/frac, tb: base.tb==null ? null : base.tb/frac };
+    progress("Training on the latest data…");
+    await sleep(0);
+    const live = M.liveCall([...closed, liveCandle], ctx);
+    const sig = src + (ctx.funding?"f":"") + (ctx.premium?"p":"") + (closed[0].tb!=null?"t":"");
+    const reuse = !!(state && state.bt && state.sig===sig && now - state.btAt < 6*3600000);
+    state = { live, price, src, sig, cs, closedN: closed.length, ctx, flow, askedAt: now, bt: reuse ? state.bt : null, btAt: reuse ? state.btAt : now };
+    renderCall(); renderStatus(); renderFlow();
+    let hist = loadHist();
+    hist.push({ t: now, price, p: live.p, th: TH, dir: M.label(live.p, TH).dir, word: M.label(live.p, TH).word, later: null, right: null, flow: flow ? { book: flow.book, tape: flow.tape } : null });
+    saveHist(hist);
+    renderHistory(hist);
+    if (!state.bt){
+      $("btNote").textContent = "Running the out-of-sample test…";
+      state.bt = await M.backtest(closed, ctx, { onProgress: f => { $("btNote").textContent = `Running the out-of-sample test… ${Math.round(f*100)}%`; } });
+    }
+    renderBacktest();
+    try { hist = await resolveHistory(hist); renderHistory(hist); } catch (e) { console.error(e); }
+    clearTimeout(nextCheck);
+    nextCheck = setTimeout(async ()=>{ try { renderHistory(await resolveHistory(loadHist())); } catch {} }, 16*60000);
+  } catch (e) {
+    console.error(e);
+    $("verdict").className = "verdict";
+    $("arrow").innerHTML = ARROWS.flat;
+    $("bigText").textContent = "No data";
+    $("subText").innerHTML = `<span class="err"></span>`;
+    $("subText").firstChild.textContent = e.message + (e.allNetwork ? " If you opened this file inside an app's preview (Files, Mail, Drive or the Claude app), open it in Safari or Chrome instead. Previews usually block internet access." : "");
+  } finally {
+    busy = false; $("ask").disabled = false; $("ask").textContent = "Ask again";
+  }
+}
+$("ask").addEventListener("click", ask);
+setTH(TH);
+renderHistory(loadHist());
+ask();
+</script>
+</body>
+</html>

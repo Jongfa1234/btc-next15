@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H0e6rRV7XvLCTNULRkc2y5m+ennEEGxliXO+sFwJKN8=' 'sha256-b7kT/zH8yM0F8g2CgTnv1kMK0wuco8fHBCXf0OHmZ+k='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H0e6rRV7XvLCTNULRkc2y5m+ennEEGxliXO+sFwJKN8=' 'sha256-UKz47wmolsghxPBwHRcQRymtobMqYX/NPNCZWytEeZI='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://external-api.kalshi.com https://api.elections.kalshi.com https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
@@ -124,6 +124,10 @@ details summary{cursor:pointer;font-weight:700}
 .rec-list li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
 .rec-list li span:nth-child(2){color:var(--muted);min-width:0}
 .rec p.note{margin:0}
+.rh{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-top:4px;cursor:pointer}
+.rh input{width:20px;height:20px;accent-color:var(--accent);margin:0;padding:0;flex:none}
+.rh-note{margin:0;font-size:13px;color:var(--muted)}
+.tform input:disabled{opacity:1;color:var(--fg);background:var(--surface);border-style:dashed}
 .fine{margin:0;font-size:12px;color:var(--muted);text-align:center}
 .more>summary{cursor:pointer;font-weight:700;padding:12px 0;color:var(--muted);list-style-position:inside}
 .more-body{display:flex;flex-direction:column;gap:18px}
@@ -142,7 +146,9 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
 
   <section class="card main-card">
     <form id="tForm" class="tform" novalidate>
-      <div class="field"><label for="tPrice">Target price</label><input id="tPrice" name="tPrice" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Leave empty for just up or down"></div>
+      <div class="field"><label for="tPrice">Target price</label><input id="tPrice" name="tPrice" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Leave empty for just up or down">
+        <label class="rh" for="useRH"><input type="checkbox" id="useRH" checked> Use Robinhood's target for this window</label>
+        <p class="rh-note" id="rhNote" hidden></p></div>
       <div class="field"><span class="flabel" id="tLbl">Which 15 minutes?</span>
         <div class="seg segw" id="tChips" role="group" aria-labelledby="tLbl"><button type="button" data-w="0"></button><button type="button" data-w="1"></button><button type="button" data-w="2"></button><button type="button" data-w="3"></button></div>
       </div>
@@ -481,7 +487,7 @@ async function getJSON(url, {timeout=10000, tries=3}={}){
 }
 
 // Status of every source, shown on the page.
-const SOURCES = { candles:"Price history", flowHist:"Trade flow history", funding:"Funding rate", premium:"Futures premium", live:"Live order book", check:"15-minute check" };
+const SOURCES = { candles:"Price history", flowHist:"Trade flow history", funding:"Funding rate", premium:"Futures premium", live:"Live order book", check:"15-minute check", kalshi:"Robinhood target" };
 const status = {};
 const setStatus = (key, ok, detail) => { status[key] = { ok, detail }; renderStatus(); };
 
@@ -753,7 +759,7 @@ async function ask(){
     let { cs, src } = await getCandles(progress);
     const days = Math.ceil((Date.now()-cs[0].t)/864e5);
     progress("Almost there…");
-    const [csFlow, funding, premium, flow] = await Promise.all([addTradeFlow(cs, src), getFunding(days+2), getPremium(days, cs.length), liveFlow()]);
+    const [csFlow, funding, premium, flow] = await Promise.all([addTradeFlow(cs, src), getFunding(days+2), getPremium(days, cs.length), liveFlow(), loadKalshi()]);
     cs = csFlow;
     const ctx = { funding, premium };
     const now = Date.now(), closed = cs.filter(k => k.t + M.Q <= now), cur = cs.find(k => k.t + M.Q > now);
@@ -792,6 +798,30 @@ async function ask(){
   }
 }
 $("ask").addEventListener("click", ask);
+// ---------- Robinhood's target: Robinhood's Bitcoin 15-minute contracts come from Kalshi, which publishes them openly ----------
+const KAL = ["https://external-api.kalshi.com/trade-api/v2", "https://api.elections.kalshi.com/trade-api/v2"];
+let kal = { markets: [], at: 0 };
+const posNum = (x)=>{ x = +x; return isFinite(x) && x > 0 ? x : null; };
+async function loadKalshi(){
+  const errs = [];
+  for (const base of KAL){
+    try {
+      const j = await getJSON(`${base}/markets?series_ticker=KXBTC15M&status=open&limit=50`, { timeout: 8000, tries: 1 });
+      const ms = (Array.isArray(j.markets) ? j.markets : []).map(m=>({
+        start: Date.parse(m.open_time), end: Date.parse(m.close_time),
+        strike: posNum(m.floor_strike) ?? posNum(m.functional_strike) ?? posNum(m.custom_strike) ?? posNum(m.cap_strike),
+        bid: posNum(m.yes_bid_dollars), ask: posNum(m.yes_ask_dollars), last: posNum(m.last_price_dollars)
+      })).filter(m=>isFinite(m.end) && m.strike);
+      kal = { markets: ms, at: Date.now() };
+      setStatus("kalshi", true, `Kalshi, ${ms.length} open window${ms.length===1?"":"s"}`);
+      return;
+    } catch (e) { errs.push(e.message); }
+  }
+  kal = { markets: [], at: Date.now() };
+  setStatus("kalshi", false, "Kalshi (where Robinhood's Bitcoin contracts come from): " + errs.join("; "));
+}
+const rhMarket = (w)=> kal.markets.find(m=>Math.abs(m.end - w.end) < 60000) || null;
+const crowd = (m)=> m.bid && m.ask ? (m.bid + m.ask)/2 : m.last;
 // ---------- its record: right or wrong for every 15-minute window ----------
 function renderRecord(){
   if (!state || !state.bt) return;
@@ -833,7 +863,7 @@ function renderChips(){
 }
 function showOut(cls, text){ const out = $("tOut"); out.innerHTML = `<p class="${cls}"></p>`; out.firstChild.textContent = text; }
 // Works out the answer for window index i and target K (null = up or down for that window).
-function windowAnswer(i, K){
+function windowAnswer(i, K, alwaysAbove){
   const w = windows()[i], now = Date.now(), S = state.price, st = state.moves, p = state.live.p;
   const toEnd = Math.max(0.25, (w.end - now)/60000);
   if (K == null){
@@ -846,7 +876,7 @@ function windowAnswer(i, K){
     return { w, side: up?"up":"down", chance: up?pw:1-pw, ref: null,
       detail: `"Up" means the ${fmtTime(w.end)} price ends above the ${fmtTime(w.start)} price. It's ${fmtUsd(S)} now.` };
   }
-  const r = M.target(st, S, K, i===0 ? 0.5 : p, toEnd), above = K >= S;
+  const r = M.target(st, S, K, i===0 ? 0.5 : p, toEnd), above = alwaysAbove || K >= S;
   return { w, side: above?"above":"below", chance: above?r.above:r.below, ref: null,
     detail: `It's ${fmtUsd(S)} now. Chance it hits ${fmtUsd(K)} at any point before ${fmtTime(w.end)}: ${fmtChance(r.touch).toLowerCase()}.` };
 }
@@ -854,15 +884,30 @@ let lastAnswer = null;
 function renderTarget(){
   renderChips();
   if (!state){ lastAnswer = null; return loadErr ? showOut("err", loadErr) : showOut("t-wait", loadMsg); }
-  const raw = $("tPrice").value.trim(), S = state.price;
-  let K = null;
+  const S = state.price, useRH = $("useRH").checked, w = windows()[WIN];
+  $("tPrice").disabled = useRH;
+  let raw = $("tPrice").value.trim(), K = null, rh = null;
+  if (useRH){
+    rh = rhMarket(w);
+    const note = $("rhNote"); note.hidden = false;
+    if (rh){
+      raw = String(rh.strike); $("tPrice").value = fmtUsd(rh.strike);
+      const c = crowd(rh);
+      note.textContent = `Robinhood's target for ${fmtWin(w.start, w.end)}: ${fmtUsd(rh.strike)}.` + (c ? ` Robinhood traders currently price "above" at ${Math.round(c*100)}%.` : "");
+    } else {
+      raw = ""; $("tPrice").value = "";
+      note.textContent = status.kalshi && !status.kalshi.ok
+        ? "Couldn't load Robinhood's targets right now. Untick the box to type one yourself. (Details shows why.)"
+        : `Robinhood hasn't posted a target for ${fmtWin(w.start, w.end)} yet. It usually appears when the window starts. Showing up or down instead.`;
+    }
+  } else $("rhNote").hidden = true;
   if (raw){
     K = parsePrice(raw);
     if (!(K > 0)) return showOut("err", "Type a price like 92000, 92,000 or 92k.");
     if (K < S*0.5 || K > S*2) return showOut("err", `That's very far from the current price of ${fmtUsd(S)}. Try a price closer to it.`);
   }
-  try { localStorage.setItem(TGT_STORE, JSON.stringify({ k: K })); } catch {}
-  const a = windowAnswer(WIN, K); lastAnswer = { ...a, K };
+  try { localStorage.setItem(TGT_STORE, JSON.stringify({ k: useRH ? null : K, rh: useRH })); } catch {}
+  const a = windowAnswer(WIN, K, !!rh); lastAnswer = { ...a, K };
   const span = fmtWin(a.w.start, a.w.end);
   const headline = K == null ? `chance ${span} ends ${a.side.toUpperCase()}` : `chance it's ${a.side} ${fmtUsd(K)} at ${fmtTime(a.w.end)}`;
   const tone = a.chance < 0.55 ? "mid" : (a.side==="up"||a.side==="above") ? "good" : "bad";
@@ -890,13 +935,17 @@ $("tChips").addEventListener("click", e=>{
 });
 $("tForm").addEventListener("submit", async e=>{
   e.preventDefault();
+  if (state && $("useRH").checked && Date.now() - kal.at > 30000) await loadKalshi();
   if (!state || Date.now() - state.askedAt > 60000){ loadMsg = "Getting the latest price…"; if (state) showOut("t-wait", loadMsg); if (await ask() === false) return; }
   renderTarget(); saveGuess();
 });
 // Keep the window labels current; when a window ends, move the picker along with the clock.
 let lastStart = windows()[0].start;
-setInterval(()=>{ const s = windows()[0].start; if (s !== lastStart){ lastStart = s; WIN = Math.max(0, WIN-1); if (state) renderTarget(); } renderChips(); }, 15000);
-try { const j = JSON.parse(localStorage.getItem(TGT_STORE)); if (j && j.k > 0 && isFinite(j.k)) $("tPrice").value = String(Math.round(j.k*100)/100); } catch {}
+setInterval(async ()=>{ const s = windows()[0].start; if (s !== lastStart){ lastStart = s; WIN = Math.max(0, WIN-1); if (state) renderTarget(); }
+  if ($("useRH").checked && state && !rhMarket(windows()[WIN]) && Date.now() - kal.at > 45000){ await loadKalshi(); renderTarget(); }
+  renderChips(); }, 15000);
+try { const j = JSON.parse(localStorage.getItem(TGT_STORE)); if (j && j.k > 0 && isFinite(j.k)) $("tPrice").value = String(Math.round(j.k*100)/100); if (j && j.rh === false) $("useRH").checked = false; } catch {}
+$("useRH").addEventListener("change", ()=>{ if (!$("useRH").checked) $("tPrice").value = ""; renderTarget(); if (!$("useRH").checked) $("tPrice").focus(); });
 renderChips();
 setTH(TH);
 renderHistory(loadHist());

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v5RenQcgVbqQdGoTgdUm1wttEoVrFNwdKoKo4k5wkq8=' 'sha256-WKJbBdzYqwapuF2NH3R5IiNZxgJ+aG23FeFs0zYqAxY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lEPlJf7jxWdxNU01MfFM1LWMb3jnVC3jMkC3fM2Q7MA=' 'sha256-Hn3gcKYp1QGgMILvY4uMrZCCXD+gzLQITiWs9DEMfFU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
@@ -21,6 +21,7 @@
   --bg:#0f1113; --surface:#171a1d; --fg:#eceee9; --muted:#9aa1a8; --line:#2a2f34;
   --accent:#f5a524; --on-accent:#1b1200; --up:#34c38f; --down:#f06a5f; --flat:#9aa1a8; color-scheme:dark;}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--display);
   padding-block:max(20px,env(safe-area-inset-top)) max(32px,env(safe-area-inset-bottom));
@@ -88,6 +89,35 @@ details summary{cursor:pointer;font-weight:700}
 .err-box{font-size:13px;border:1px solid color-mix(in srgb,var(--down) 45%,var(--line));background:color-mix(in srgb,var(--down) 7%,transparent);border-radius:8px;padding:10px 12px}
 .err-box ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
 .err-box li{overflow-wrap:anywhere}
+.main-card{display:flex;flex-direction:column;gap:18px}
+.tform{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.flabel{font-size:14px;font-weight:700}
+.tform input{font:600 18px var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%;min-width:0}
+.tform input::placeholder{font:500 15px var(--display);color:var(--muted)}
+.tform input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.seg5{grid-template-columns:repeat(5,1fr)}
+.seg5 button{font:600 13px var(--display)}
+.other{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.other input{width:110px}
+#tGo{font-size:18px;padding:16px}
+.t-out{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:16px}
+.t-wait{margin:0;color:var(--muted)}
+.t-out .err{margin:0}
+.t-answer{display:flex;flex-direction:column;gap:2px}
+.t-answer b{font-size:44px;font-weight:600;line-height:1}
+.t-answer span{font-size:18px;font-weight:700;line-height:1.3}
+.t-answer.good b{color:var(--up)} .t-answer.bad b{color:var(--down)}
+.t-bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.t-bar span{display:block;height:100%;background:var(--fg)}
+.t-answer.good + .t-bar span{background:var(--up)} .t-answer.bad + .t-bar span{background:var(--down)}
+.t-detail{margin:0;font-size:14px}
+.t-trust{margin:0;font-size:13px;color:var(--muted)}
+.fine{margin:0;font-size:12px;color:var(--muted);text-align:center}
+.more>summary{cursor:pointer;font-weight:700;padding:12px 0;color:var(--muted);list-style-position:inside}
+.more-body{display:flex;flex-direction:column;gap:18px}
+button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);font-size:14px;padding:10px}
+.call h2{margin:0}
 @media (max-width:400px){.big{font-size:26px}.flow{grid-template-columns:1fr}.stat b{font-size:19px}}
 @media (prefers-reduced-motion:reduce){.meter i{transition:none}}
 </style>
@@ -99,12 +129,30 @@ details summary{cursor:pointer;font-weight:700}
     <div class="price mono" id="price">Loading price…</div>
   </header>
 
-  <section class="card call" aria-live="polite">
+  <section class="card main-card">
+    <form id="tForm" class="tform" novalidate>
+      <div class="field"><label for="tPrice">Target price</label><input id="tPrice" name="tPrice" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Leave empty for just up or down"></div>
+      <div class="field"><span class="flabel" id="tLbl">How long from now?</span>
+        <div class="seg seg5" id="tChips" role="group" aria-labelledby="tLbl"><button type="button" data-m="5">5 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 hour</button><button type="button" data-m="other">Other</button></div>
+        <div class="other" id="otherRow" hidden><input id="tMins" name="tMins" type="number" min="1" max="240" step="1" value="15" aria-label="Minutes from now"><span>minutes (1 to 240)</span></div>
+      </div>
+      <button type="submit" id="tGo">Predict</button>
+    </form>
+    <div id="tOut" class="t-out" aria-live="polite"><p class="t-wait">Getting prices… the first time takes about 15 seconds.</p></div>
+  </section>
+
+  <p class="fine">A guess based on recent price moves, not financial advice. Nobody can reliably predict Bitcoin minutes ahead.</p>
+
+  <details class="more" id="more">
+    <summary>Details</summary>
+    <div class="more-body">
+  <section class="card call">
+    <h2>Up or down in the next 15 minutes</h2>
     <div class="verdict" id="verdict">
       <div class="arrow" id="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg></div>
       <div class="verdict-text">
         <div class="big" id="bigText">Checking…</div>
-        <div class="sub" id="subText">Downloading about 90 days of 15-minute candles. The first time takes 10 to 20 seconds.</div>
+        <div class="sub" id="subText">Downloading about 90 days of prices.</div>
       </div>
     </div>
     <div>
@@ -112,7 +160,7 @@ details summary{cursor:pointer;font-weight:700}
       <div class="meter-labels"><span>More likely down</span><span id="probText" class="mono">Up 50%</span><span>More likely up</span></div>
     </div>
     <div class="seg-row">
-      <label id="thLabel">Only make a call when the model is at least this sure</label>
+      <label id="thLabel">Only say up or down when at least this sure</label>
       <div class="seg" role="group" aria-labelledby="thLabel" id="thSeg">
         <button type="button" data-th="0.5" id="th50">Any</button>
         <button type="button" data-th="0.52" id="th52">52%</button>
@@ -121,7 +169,7 @@ details summary{cursor:pointer;font-weight:700}
         <button type="button" data-th="0.6" id="th60">60%</button>
       </div>
     </div>
-    <button id="ask" type="button">Ask again</button>
+    <button id="ask" type="button" class="ghost">Refresh</button>
     <div class="note" id="dataNote"></div>
     <div class="src" id="srcChips"></div>
     <div class="err-box" id="errBox" hidden></div>
@@ -159,13 +207,16 @@ details summary{cursor:pointer;font-weight:700}
     <p class="note" id="histSummary"></p>
   </section>
 
-  <div class="warn"><b>Not financial advice.</b> Nobody can reliably predict where Bitcoin goes in 15 minutes. Short-term moves are mostly noise, and even good signals are right only a little more than half the time. Use this as a curiosity, not a reason to trade. Fees and slippage would wipe out a small edge.</div>
+  <div class="warn"><b>Not financial advice.</b> Nobody can reliably predict where Bitcoin goes in the next few minutes. Short-term moves are mostly noise, and even good signals are right only a little more than half the time. Use this as a curiosity, not a reason to trade. Fees and slippage would wipe out a small edge.</div>
 
-  <details class="card">
-    <summary>How it works</summary>
+  <section class="card">
+    <h2>How it works</h2>
     <p class="note">It downloads about 90 days of 15-minute BTC-USD candles from Coinbase (Binance.US, then Binance, are the backups). Coinbase candles don't split buyers from sellers, so that share comes from Binance.US for the same 15 minutes. When reachable, it also pulls perpetual-futures funding rates (OKX or Binance) and the Binance futures premium over spot. Each source that fails is skipped and listed on the page.</p>
     <p class="note">For every candle it measures momentum over 15 minutes, 1 hour and 4 hours, RSI, a short vs. long moving-average gap, where the price sits in its recent range, volume spikes, time of day, and trade flow (the share of volume from buyers hitting the market). With futures data it adds the funding rate and the futures premium. A logistic-regression model learns from the last 60 days how those relate to the next candle going up or down.</p>
     <p class="note">The out-of-sample test covers the most recent 30 days. The model is never shown the day it is judged on. The "luck range" is where a pure coin flip would land 95% of the time with that many calls. A hit rate inside it is not evidence of a real edge.</p>
+    <p class="note">For a target price, it looks at how big BTC's moves have been over the last 30 days, scales them to your time frame, and nudges them by the model's up/down lean for the next 15 minutes. It assumes the near future moves like the last month did. Around big news, moves get bigger than this expects.</p>
+  </section>
+    </div>
   </details>
 </main>
 
@@ -283,6 +334,37 @@ M.liveCall = (cs, ctx) => {
   const model = M.trainAt(F, cs, i-1, Math.min(5760, i-1-M.WARM));
   return { p: model.predict(F[i]), names, w: model.w };
 };
+// ---------- price target: empirical move sizes, nudged by the model's lean ----------
+M.sortedNum = (a)=> Float64Array.from(a).sort();
+M.fracGE = (sorted, x) => { let lo=0, hi=sorted.length; while (lo<hi){ const m=(lo+hi)>>1; if (sorted[m] < x) lo=m+1; else hi=m; } return (sorted.length-lo)/sorted.length; };
+M.quantile = (sorted, q) => { const i = Math.min(sorted.length-1, Math.max(0, q*(sorted.length-1))), a = Math.floor(i), b = Math.ceil(i); return sorted[a] + (sorted[b]-sorted[a])*(i-a); };
+// From completed candles: each 15m move, its high and low excursion, all divided by the volatility of the day before it.
+M.moveStats = (cs, look=2880, volN=96) => {
+  const r = []; for (let i=1;i<cs.length;i++) r.push(Math.log(cs[i].c/cs[i-1].c));
+  const z=[], hz=[], lz=[]; let s1=0, s2=0;
+  for (let j=0;j<r.length;j++){
+    if (j >= volN){
+      const sd = Math.sqrt(Math.max(s2/volN-(s1/volN)**2, 1e-12)), i = j+1;
+      if (i >= cs.length - look){ const k = cs[i], prev = cs[i-1].c;
+        z.push(r[j]/sd); hz.push(Math.log(Math.max(k.h,prev)/prev)/sd); lz.push(Math.log(prev/Math.min(k.l,prev))/sd); }
+      s1 -= r[j-volN]; s2 -= r[j-volN]**2;
+    }
+    s1 += r[j]; s2 += r[j]**2;
+  }
+  const last = r.slice(-volN), m = last.reduce((a,b)=>a+b,0)/last.length;
+  return { z: M.sortedNum(z), hz: M.sortedNum(hz), lz: M.sortedNum(lz), sigma: Math.sqrt(last.reduce((a,b)=>a+(b-m)**2,0)/last.length) };
+};
+// S = price now, K = target, p = model's chance of "up" over the next 15 min, mins = time frame.
+// Moves scale with the square root of time; the model's lean is only applied to the first 15 minutes.
+M.target = (st, S, K, p, mins) => {
+  const s = Math.sqrt(mins/15), sig = st.sigma*s;
+  const shift = (-M.quantile(st.z, 1-p)) * Math.min(mins,15)/15 / s; // in units of a typical move over the time frame
+  const x = Math.log(K/S)/sig;
+  const above = M.fracGE(st.z, x - shift), below = 1 - above;
+  const touch = K >= S ? Math.max(above, M.fracGE(st.hz, x - shift)) : Math.max(below, M.fracGE(st.lz, -x + shift));
+  const band = [1/6, 5/6].map(q => S*Math.exp((M.quantile(st.z, q) + shift)*sig));
+  return { above, below, touch, x, band, movePct: sig };
+};
 if (typeof module !== "undefined") module.exports = M;
 </script>
 
@@ -360,7 +442,7 @@ async function coinbaseCandles(granSec, days, progress, useCache=true){
         const rows = await getJSON(`${CB}/products/BTC-USD/candles?granularity=${granSec}&start=${iso(s)}&end=${iso(e)}`);
         for (const [t,l,h,o,c,v] of rows) if ([t,l,h,o,c,v].every(x=>isFinite(+x))) have.set(t*1000, {t:t*1000,o:+o,h:+h,l:+l,c:+c,v:+v,tb:null});
       } catch (err) { failed++; lastErr = err; }
-      if (progress) progress(`Downloading Coinbase candles… ${++done} of ${windows.length+1}`);
+      if (progress) progress(`Getting price history… ${++done} of ${windows.length+1}`);
     }));
     if (i+4 < windows.length) await sleep(300); // stay under Coinbase's public rate limit
   }
@@ -592,11 +674,12 @@ $("thSeg").addEventListener("click", e=>{ const b = e.target.closest("button[dat
 let busy = false, nextCheck = null;
 async function ask(){
   if (busy) return; busy = true; $("ask").disabled = true; $("ask").textContent = "Checking…";
-  const progress = (t)=>{ $("ask").textContent = t.length < 46 ? t : "Checking…"; if (!state) $("subText").textContent = t; };
+  const progress = (t)=>{ $("ask").textContent = t.length < 46 ? t : "Checking…"; if (!state){ $("subText").textContent = t; loadMsg = t; renderTarget(); } };
+  loadErr = null;
   try {
     let { cs, src } = await getCandles(progress);
     const days = Math.ceil((Date.now()-cs[0].t)/864e5);
-    progress("Checking trade flow, futures and the order book…");
+    progress("Almost there…");
     const [csFlow, funding, premium, flow] = await Promise.all([addTradeFlow(cs, src), getFunding(days+2), getPremium(days, cs.length), liveFlow()]);
     cs = csFlow;
     const ctx = { funding, premium };
@@ -606,13 +689,14 @@ async function ask(){
     const base = cur || { t: closed[closed.length-1].t + M.Q, o: price, h: price, l: price, c: price, v: 0, tb: closed[0].tb==null?null:0 };
     const frac = Math.min(1, Math.max(0.1, (now - base.t)/M.Q));
     const liveCandle = { ...base, v: base.v/frac, tb: base.tb==null ? null : base.tb/frac };
-    progress("Training on the latest data…");
+    progress("Working out the odds…");
     await sleep(0);
     const live = M.liveCall([...closed, liveCandle], ctx);
     const sig = src + (ctx.funding?"f":"") + (ctx.premium?"p":"") + (closed[0].tb!=null?"t":"");
     const reuse = !!(state && state.bt && state.sig===sig && now - state.btAt < 6*3600000);
     state = { live, price, src, sig, cs, closedN: closed.length, ctx, flow, askedAt: now, bt: reuse ? state.bt : null, btAt: reuse ? state.btAt : now };
-    renderCall(); renderStatus(); renderFlow();
+    state.moves = M.moveStats(closed);
+    renderCall(); renderStatus(); renderFlow(); renderTarget();
     let hist = loadHist();
     hist.push({ t: now, price, p: live.p, th: TH, dir: M.label(live.p, TH).dir, word: M.label(live.p, TH).word, later: null, right: null, flow: flow ? { book: flow.book, tape: flow.tape } : null });
     saveHist(hist);
@@ -621,22 +705,91 @@ async function ask(){
       $("btNote").textContent = "Running the out-of-sample test…";
       state.bt = await M.backtest(closed, ctx, { onProgress: f => { $("btNote").textContent = `Running the out-of-sample test… ${Math.round(f*100)}%`; } });
     }
-    renderBacktest();
+    renderBacktest(); renderTarget();
     try { hist = await resolveHistory(hist); renderHistory(hist); } catch (e) { console.error(e); }
     clearTimeout(nextCheck);
     nextCheck = setTimeout(async ()=>{ try { renderHistory(await resolveHistory(loadHist())); } catch {} }, 16*60000);
+    return true;
   } catch (e) {
     console.error(e);
+    loadErr = "Couldn't get prices right now. Check your connection and tap Predict to try again. Open Details below to see which site failed.";
+    if (!state) renderTarget(); else showOut("err", "Couldn't refresh prices. Showing the last answer's data. Open Details to see why.");
+    return false;
     $("verdict").className = "verdict";
     $("arrow").innerHTML = ARROWS.flat;
     $("bigText").textContent = "No data";
     $("subText").innerHTML = `<span class="err"></span>`;
     $("subText").firstChild.textContent = e.message + (e.allNetwork ? " If you opened this file inside an app's preview (Files, Mail, Drive or the Claude app), open it in Safari or Chrome instead. Previews usually block internet access." : "");
   } finally {
-    busy = false; $("ask").disabled = false; $("ask").textContent = "Ask again";
+    busy = false; $("ask").disabled = false; $("ask").textContent = "Refresh";
   }
 }
 $("ask").addEventListener("click", ask);
+// ---------- main screen: target + time frame -> one plain answer ----------
+const TGT_STORE = "btc-next15-target";
+let loadMsg = "Getting prices… the first time takes about 15 seconds.", loadErr = null;
+const fmtChance = (x)=> x < 0.01 ? "Under 1%" : x > 0.99 ? "Over 99%" : Math.round(x*100) + "%";
+const fmtSpan = (m)=> m === 60 ? "1 hour" : m % 60 === 0 ? `${m/60} hours` : m > 60 ? `${Math.floor(m/60)} h ${m%60} min` : `${m} min`;
+function parsePrice(t){
+  t = String(t).trim().toLowerCase().replace(/[$,\s]/g, "");
+  const m = t.match(/^(\d+(?:\.\d+)?)(k?)$/); if (!m) return NaN;
+  return parseFloat(m[1]) * (m[2] ? 1000 : 1);
+}
+function setMins(v, other){
+  v = Math.round(+v);
+  const quick = [5,15,30,60].includes(v) && !other;
+  if (v >= 1 && v <= 240) $("tMins").value = v;
+  $("otherRow").hidden = quick;
+  for (const b of $("tChips").querySelectorAll("button")) b.setAttribute("aria-pressed", String(quick ? +b.dataset.m === v : b.dataset.m === "other"));
+}
+function showOut(cls, text){ const out = $("tOut"); out.innerHTML = `<p class="${cls}"></p>`; out.firstChild.textContent = text; }
+function renderTarget(){
+  if (!state){ return loadErr ? showOut("err", loadErr) : showOut("t-wait", loadMsg); }
+  const raw = $("tPrice").value.trim(), mins = Math.round(+$("tMins").value), S = state.price;
+  if (!(mins >= 1 && mins <= 240)) return showOut("err", "Pick a time from 1 to 240 minutes.");
+  let K = S;
+  if (raw){
+    K = parsePrice(raw);
+    if (!(K > 0)) return showOut("err", "Type a price like 92000, 92,000 or 92k.");
+    if (K < S*0.5 || K > S*2) return showOut("err", `That's very far from the current price of ${fmtUsd(S)}. Try a price closer to it.`);
+  }
+  try { localStorage.setItem(TGT_STORE, JSON.stringify({ k: raw ? K : null, m: mins })); } catch {}
+  const r = M.target(state.moves, S, K, state.live.p, mins), span = fmtSpan(mins), at = fmtTime(Date.now() + mins*60000);
+  let chance, headline, detail;
+  if (!raw){
+    const up = r.above >= 0.5; chance = up ? r.above : r.below;
+    headline = `chance it's ${up ? "higher" : "lower"} in ${span}`;
+    detail = `Right now it's ${fmtUsd(S)}. By ${at} it will most likely be between ${fmtUsd(r.band[0])} and ${fmtUsd(r.band[1])}.`;
+  } else {
+    const above = K >= S; chance = above ? r.above : r.below;
+    headline = `chance it's ${above ? "above" : "below"} ${fmtUsd(K)} in ${span}`;
+    detail = `Right now it's ${fmtUsd(S)}. Chance it hits ${fmtUsd(K)} at any point before ${at}: ${fmtChance(r.touch).toLowerCase()}.`;
+  }
+  const goingUp = raw ? (K >= S) === (chance >= 0.5) ? K >= S : K < S : r.above >= 0.5;
+  const tone = chance < 0.55 ? "mid" : goingUp ? "good" : "bad";
+  const out = $("tOut");
+  out.innerHTML = `<div class="t-answer ${tone}"><b class="mono"></b><span></span></div><div class="t-bar"><span></span></div><p class="t-detail"></p><p class="t-trust"></p>`;
+  out.querySelector(".t-answer b").textContent = fmtChance(chance);
+  out.querySelector(".t-answer span").textContent = headline;
+  out.querySelector(".t-bar span").style.width = (chance*100).toFixed(1) + "%";
+  out.querySelector(".t-detail").textContent = detail;
+  const bt = state.bt ? M.score(state.bt.rows, 0.5) : null;
+  out.querySelector(".t-trust").textContent = bt
+    ? `How good is this? Over the last 30 days, its up-or-down guesses were right ${fmtPct(bt.acc,0)} of the time. A coin flip gets 50%.`
+    : "Checking how well this has done over the last 30 days…";
+}
+$("tChips").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-m]"); if (!b) return;
+  if (b.dataset.m === "other"){ setMins($("tMins").value, true); $("tMins").focus(); } else setMins(+b.dataset.m);
+  renderTarget();
+});
+$("tMins").addEventListener("input", ()=>{ if (+$("tMins").value >= 1) renderTarget(); });
+$("tForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  if (!state || Date.now() - state.askedAt > 60000){ loadMsg = "Getting the latest price…"; if (state) showOut("t-wait", loadMsg); if (await ask() === false) return; }
+  renderTarget();
+});
+try { const j = JSON.parse(localStorage.getItem(TGT_STORE)); if (j && j.k > 0 && isFinite(j.k)) $("tPrice").value = String(Math.round(j.k*100)/100); setMins(j && j.m >= 1 && j.m <= 240 ? j.m : 15); } catch { setMins(15); }
 setTH(TH);
 renderHistory(loadHist());
 ask();

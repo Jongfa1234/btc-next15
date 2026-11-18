@@ -82,7 +82,9 @@ async function main() {
   if (cur && cur.strike == null) {
     const ms = await kalshiMarkets();
     const m = ms && ms.find((x) => Math.abs(x.end - end) < 60000);
-    if (m) {
+    const late = now - start > 6 * 60000; // later than this, the crowd price already reflects much of the window
+    if (m && late) { cur.strike = m.strike; notes.push(`kalshi strike ${m.strike} (too late in the window to follow)`); }
+    else if (m) {
       cur.strike = m.strike; cur.crowd = m.bid && m.ask ? Math.round((m.bid + m.ask) / 2 * 1000) / 1000 : m.last; cur.crowdAt = new Date(now).toISOString();
       // Assume the best call is followed: buy the likelier side at Robinhood's ask (or mid) if every check passes.
       const up = cur.pUp >= 0.5, bestP = Math.max(cur.pUp, 1 - cur.pUp);

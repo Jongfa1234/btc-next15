@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lEPlJf7jxWdxNU01MfFM1LWMb3jnVC3jMkC3fM2Q7MA=' 'sha256-YeAEaLli9rtKl3TJXXKnrupI3p5WsnUqblNMdelzjnA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H0e6rRV7XvLCTNULRkc2y5m+ennEEGxliXO+sFwJKN8=' 'sha256-b7kT/zH8yM0F8g2CgTnv1kMK0wuco8fHBCXf0OHmZ+k='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
@@ -112,7 +112,18 @@ details summary{cursor:pointer;font-weight:700}
 .t-bar span{display:block;height:100%;background:var(--fg)}
 .t-answer.good + .t-bar span{background:var(--up)} .t-answer.bad + .t-bar span{background:var(--down)}
 .t-detail{margin:0;font-size:14px}
-.t-trust{margin:0;font-size:13px;color:var(--muted)}
+.rec{display:flex;flex-direction:column;gap:12px}
+.rec h2{margin:0}
+.rec-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.rec-top b{font-size:28px;font-weight:600}
+.rec-top span{font-size:14px;min-width:0}
+.rec-strip{display:grid;grid-template-columns:repeat(24,1fr);gap:3px}
+.rec-strip i{aspect-ratio:1;border-radius:2px;background:var(--line);max-width:100%}
+.rec-strip i.ok{background:var(--up)} .rec-strip i.bad{background:var(--down)}
+.rec-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.rec-list li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.rec-list li span:nth-child(2){color:var(--muted);min-width:0}
+.rec p.note{margin:0}
 .fine{margin:0;font-size:12px;color:var(--muted);text-align:center}
 .more>summary{cursor:pointer;font-weight:700;padding:12px 0;color:var(--muted);list-style-position:inside}
 .more-body{display:flex;flex-direction:column;gap:18px}
@@ -138,6 +149,15 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
       <button type="submit" id="tGo">Predict</button>
     </form>
     <div id="tOut" class="t-out" aria-live="polite"><p class="t-wait">Getting prices… the first time takes about 15 seconds.</p></div>
+  </section>
+
+  <section class="card rec">
+    <h2>Its record</h2>
+    <div class="rec-top"><b class="mono" id="recBig">–</b><span id="recSub">Loading its record…</span></div>
+    <div class="rec-strip" id="recStrip" aria-hidden="true"></div>
+    <ul class="rec-list" id="recList"></ul>
+    <p class="note" id="recNote"></p>
+    <p class="note">How it improves: every day it checks this record, switches to whichever of its 3 setups has been most accurate over the past week, and corrects its percentages so that "60%" really comes true about 60% of the time.</p>
   </section>
 
   <p class="fine">A guess based on recent price moves, not financial advice. Nobody can reliably predict Bitcoin minutes ahead.</p>
@@ -197,6 +217,8 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
       <table><thead><tr><th>Call only when at least</th><th class="r">Calls</th><th class="r">How often</th><th class="r">Right</th><th class="r">Luck range</th></tr></thead><tbody id="thBody"></tbody></table>
     </div>
     <p class="note" id="btNote"></p>
+    <h2 style="margin-top:16px">Setups it chooses from</h2>
+    <div class="table-wrap"><table><thead><tr><th>Setup</th><th class="r">Past week</th><th class="r">30 days</th></tr></thead><tbody id="varBody"></tbody></table></div>
   </section>
 
   <section class="card">
@@ -212,6 +234,7 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
     <h2>How it works</h2>
     <p class="note">It downloads about 90 days of 15-minute BTC-USD candles from Coinbase (Binance.US, then Binance, are the backups). Coinbase candles don't split buyers from sellers, so that share comes from Binance.US for the same 15 minutes. When reachable, it also pulls perpetual-futures funding rates (OKX or Binance) and the Binance futures premium over spot. Each source that fails is skipped and listed on the page.</p>
     <p class="note">For every candle it measures momentum over 15 minutes, 1 hour and 4 hours, RSI, a short vs. long moving-average gap, where the price sits in its recent range, volume spikes, time of day, and trade flow (the share of volume from buyers hitting the market). With futures data it adds the funding rate and the futures premium. A logistic-regression model learns from the last 60 days how those relate to the next candle going up or down.</p>
+    <p class="note">It also learns from its own record. It runs three setups side by side: one that learns from 60 days, one from only the last 20 days (so it adapts faster when the market changes), and a cautious one. Each day it uses whichever was most accurate over the past week. It then compares the percentages it gave over the past two weeks with what actually happened and corrects them, so a "60%" comes true about 60% of the time. All of this is judged only on windows it hadn't seen yet, so the record isn't flattering itself.</p>
     <p class="note">The out-of-sample test covers the most recent 30 days. The model is never shown the day it is judged on. The "luck range" is where a pure coin flip would land 95% of the time with that many calls. A hit rate inside it is not evidence of a real edge.</p>
     <p class="note">For a target price, it looks at how big BTC's moves have been over the last 30 days, scales them to your time frame, and nudges them by the model's up/down lean for the next 15 minutes. It assumes the near future moves like the last month did. Around big news, moves get bigger than this expects.</p>
   </section>
@@ -295,29 +318,77 @@ M.train = (X, y, {l2=0.02, iters=200, lr=0.5}={}) => {
   return { w:[...w], b, predict:(x)=>{ let s=b; for (let j=0;j<d;j++) s+=w[j]*clip((x[j]-mu[j])/sd[j]); return 1/(1+Math.exp(-s)); } };
 };
 M.windowSizes = (n) => { const test = Math.min(2880, Math.floor(n/3)); return { test, train: Math.min(5760, n - test - M.WARM - 1) }; };
-M.trainAt = (F, cs, i, trainN) => {
+M.trainAt = (F, cs, i, trainN, opts) => {
   const X=[], y=[];
   for (let k=Math.max(M.WARM, i-trainN); k<i; k++){ X.push(F[k]); y.push(cs[k+1].c>cs[k].c?1:0); }
-  return M.train(X,y);
+  return M.train(X, y, opts);
 };
 M.label = (p, th) => {
   const conf = Math.max(p,1-p), dir = p>=0.5 ? "up" : "down";
   if (conf < Math.max(th, 0.5000001)) return { dir:"flat", word:"No call", conf };
   return { dir, word:(conf>=0.6?"Likely ":"Leaning ")+dir, conf };
 };
-// Walk-forward out-of-sample test over completed candles: retrain once a day on the prior window only.
+// ---------- learning from its own record ----------
+// Three setups. Each day it uses whichever had the best record over the previous 7 days,
+// then corrects its percentages using the previous 14 days so that "60%" is right about 60% of the time.
+M.VARIANTS = [
+  { name: "Standard (learns from 60 days)", days: 60, l2: 0.02 },
+  { name: "Fast (learns from the last 20 days)", days: 20, l2: 0.02 },
+  { name: "Cautious (60 days, smaller swings)", days: 60, l2: 0.3 }
+];
+M.PICK_N = 672; M.CAL_N = 1344;
+M.logit = (p)=>{ p = Math.min(0.999, Math.max(0.001, p)); return Math.log(p/(1-p)); };
+M.logloss = (ps, ys)=>{ let s=0; for (let i=0;i<ps.length;i++){ const p=Math.min(0.999,Math.max(0.001,ps[i])); s -= ys[i] ? Math.log(p) : Math.log(1-p); } return s/Math.max(1,ps.length); };
+M.fitCal = (ps, ys) => { // Platt scaling: p' = sigmoid(a*logit(p)+b)
+  if (ps.length < 300) return { a:1, b:0 };
+  let a=1, b=0; const x = ps.map(M.logit), n = x.length;
+  for (let it=0; it<150; it++){
+    let ga=0, gb=0;
+    for (let i=0;i<n;i++){ const e = 1/(1+Math.exp(-(a*x[i]+b))) - ys[i]; ga += e*x[i]; gb += e; }
+    a -= 2*(ga/n + 0.01*(a-1)); b -= 2*gb/n;
+  }
+  return { a: Math.max(0, Math.min(3, a)), b: Math.max(-0.5, Math.min(0.5, b)) };
+};
+M.applyCal = (c, p)=> 1/(1+Math.exp(-(c.a*M.logit(p)+c.b)));
+M.pick = (raw, ys, from, to) => { // index of the setup with the lowest log loss on rows [from, to)
+  if (to - from < 96) return 0;
+  let best = 0, bl = Infinity;
+  raw.forEach((r,v)=>{ const l = M.logloss(r.slice(from,to), ys.slice(from,to)); if (l < bl){ bl = l; best = v; } });
+  return best;
+};
+// Walk-forward record over the last 30 days: every model is retrained daily on data before that day only.
 M.backtest = async (cs, ctx, {retrainEvery=96, onProgress}={}) => {
   const { rows:F } = M.features(cs, ctx), { test, train } = M.windowSizes(cs.length);
-  const lastIdx = cs.length-2, start = lastIdx - test + 1, out = [];
-  let model = null;
-  for (let i=start; i<=lastIdx; i++){
-    if ((i-start)%retrainEvery===0){
-      model = M.trainAt(F, cs, i, train);
-      if (onProgress){ onProgress((i-start)/test); await new Promise(r=>setTimeout(r,0)); }
+  const lastIdx = cs.length-2, start = lastIdx - test + 1, V = M.VARIANTS.length;
+  const raw = M.VARIANTS.map(()=>[]), ys = [];
+  for (let i=start; i<=lastIdx; i++) ys.push(cs[i+1].c > cs[i].c ? 1 : 0);
+  for (let v=0; v<V; v++){
+    let model = null; const tn = Math.min(train, M.VARIANTS[v].days*96);
+    for (let i=start; i<=lastIdx; i++){
+      if ((i-start)%retrainEvery===0){
+        model = M.trainAt(F, cs, i, tn, { l2: M.VARIANTS[v].l2 });
+        if (onProgress){ onProgress(((v*test)+(i-start))/(V*test)); await new Promise(r=>setTimeout(r,0)); }
+      }
+      raw[v].push(model.predict(F[i]));
     }
-    out.push({ t: cs[i].t, p: model.predict(F[i]), up: cs[i+1].c > cs[i].c });
   }
-  return { rows: out, test, train };
+  // Each day: pick the setup from the past week's record, correct percentages from the past two weeks.
+  const rows = [], selRaw = [];
+  let v = 0, cal = { a:1, b:0 };
+  for (let j=0; j<ys.length; j++){
+    if (j % 96 === 0){
+      v = M.pick(raw, ys, Math.max(0, j-M.PICK_N), j);
+      cal = M.fitCal(selRaw.slice(Math.max(0, j-M.CAL_N), j), ys.slice(Math.max(0, j-M.CAL_N), j));
+    }
+    selRaw.push(raw[v][j]);
+    const i = start + j;
+    rows.push({ t: cs[i].t, w: cs[i+1].t, p: M.applyCal(cal, raw[v][j]), up: !!ys[j], v });
+  }
+  const n = ys.length;
+  const liveV = M.pick(raw, ys, Math.max(0, n-M.PICK_N), n);
+  const liveCal = M.fitCal(selRaw.slice(-M.CAL_N), ys.slice(-M.CAL_N));
+  const perVariant = raw.map(r=>({ acc: r.filter((p,j)=>(p>=0.5)===!!ys[j]).length/n, week: r.slice(-M.PICK_N).filter((p,j)=>(p>=0.5)===!!ys[n-Math.min(n,M.PICK_N)+j]).length/Math.min(n,M.PICK_N) }));
+  return { rows, test, train, liveV, liveCal, perVariant };
 };
 M.score = (rows, th) => {
   const called = rows.filter(r=>Math.max(r.p,1-r.p) >= Math.max(th,0.5000001) || th<=0.5);
@@ -326,12 +397,12 @@ M.score = (rows, th) => {
   return { n: rows.length, calls: called.length, coverage: called.length/rows.length, acc: called.length ? right/called.length : NaN,
            luck, upRate: rows.filter(r=>r.up).length/rows.length };
 };
-M.liveCall = (cs, ctx) => {
-  // cs ends with the in-progress candle (its c = latest price).
-  // Train only on labels from completed candles (k+1 <= i-1), using up to 60 days.
-  const { rows:F, names } = M.features(cs, ctx), i = cs.length-1;
-  const model = M.trainAt(F, cs, i-1, Math.min(5760, i-1-M.WARM));
-  return { p: model.predict(F[i]), names, w: model.w };
+M.liveCall = (cs, ctx, bt) => {
+  // cs ends with the in-progress candle (its c = latest price). Train only on labels from completed candles.
+  const { rows:F, names } = M.features(cs, ctx), i = cs.length-1, v = bt ? bt.liveV : 0, V = M.VARIANTS[v];
+  const model = M.trainAt(F, cs, i-1, Math.min(V.days*96, i-1-M.WARM), { l2: V.l2 });
+  const raw = model.predict(F[i]);
+  return { p: bt ? M.applyCal(bt.liveCal, raw) : raw, raw, v, names, w: model.w };
 };
 // ---------- price target: empirical move sizes, nudged by the model's lean ----------
 M.sortedNum = (a)=> Float64Array.from(a).sort();
@@ -691,22 +762,19 @@ async function ask(){
     const base = cur || { t: closed[closed.length-1].t + M.Q, o: price, h: price, l: price, c: price, v: 0, tb: closed[0].tb==null?null:0 };
     const frac = Math.min(1, Math.max(0.1, (now - base.t)/M.Q));
     const liveCandle = { ...base, v: base.v/frac, tb: base.tb==null ? null : base.tb/frac };
+    const sig = src + (ctx.funding?"f":"") + (ctx.premium?"p":"") + (closed[0].tb!=null?"t":"");
+    const reuse = !!(state && state.bt && state.sig===sig && now - state.btAt < 30*60000);
+    const bt = reuse ? state.bt : await M.backtest(closed, ctx, { onProgress: f => progress(`Checking its past record… ${Math.round(f*100)}%`) });
     progress("Working out the odds…");
     await sleep(0);
-    const live = M.liveCall([...closed, liveCandle], ctx);
-    const sig = src + (ctx.funding?"f":"") + (ctx.premium?"p":"") + (closed[0].tb!=null?"t":"");
-    const reuse = !!(state && state.bt && state.sig===sig && now - state.btAt < 6*3600000);
-    state = { live, price, open: cur ? cur.o : price, src, sig, cs, closedN: closed.length, ctx, flow, askedAt: now, bt: reuse ? state.bt : null, btAt: reuse ? state.btAt : now };
+    const live = M.liveCall([...closed, liveCandle], ctx, bt);
+    state = { live, price, open: cur ? cur.o : price, src, sig, cs, closedN: closed.length, ctx, flow, askedAt: now, bt, btAt: reuse ? state.btAt : now };
     state.moves = M.moveStats(closed);
-    renderCall(); renderStatus(); renderFlow(); renderTarget();
+    renderCall(); renderStatus(); renderFlow();
     let hist = loadHist();
     renderHistory(hist);
-    if (!state.bt){
-      $("btNote").textContent = "Running the out-of-sample test…";
-      state.bt = await M.backtest(closed, ctx, { onProgress: f => { $("btNote").textContent = `Running the out-of-sample test… ${Math.round(f*100)}%`; } });
-    }
-    renderBacktest(); renderTarget();
-    try { hist = await resolveHistory(hist); renderHistory(hist); } catch (e) { console.error(e); }
+    renderBacktest(); renderTarget(); renderRecord();
+    try { hist = await resolveHistory(hist); renderHistory(hist); renderRecord(); } catch (e) { console.error(e); }
     clearTimeout(nextCheck);
     return true;
   } catch (e) {
@@ -724,6 +792,25 @@ async function ask(){
   }
 }
 $("ask").addEventListener("click", ask);
+// ---------- its record: right or wrong for every 15-minute window ----------
+function renderRecord(){
+  if (!state || !state.bt) return;
+  const rows = state.bt.rows, day = rows.slice(-96), right = (r)=>(r.p>=0.5)===r.up;
+  const nRight = day.filter(right).length;
+  $("recBig").textContent = `${nRight} of ${day.length}`;
+  $("recSub").textContent = "windows guessed right in the last 24 hours";
+  $("recStrip").innerHTML = day.map(r=>`<i class="${right(r)?"ok":"bad"}"></i>`).join("");
+  const li = day.slice(-6).reverse().map(r=>{
+    const ok = right(r);
+    return `<li><span class="mono">${fmtWin(r.w, r.w+M.Q)}</span><span>Guessed ${r.p>=0.5?"up":"down"}, went ${r.up?"up":"down"}</span><b class="${ok?"ok-t":"bad-t"}">${ok?"Right":"Wrong"}</b></li>`;
+  });
+  $("recList").innerHTML = li.join("");
+  const all = M.score(rows, 0.5), mine = loadHist().filter(h=>h.right===true||h.right===false);
+  $("recNote").textContent = `Last 30 days: right ${fmtPct(all.acc,0)} of ${rows.length.toLocaleString()} windows. A coin flip gets 50%.` +
+    (mine.length ? ` Your saved guesses: ${mine.filter(h=>h.right).length} of ${mine.length} right.` : "");
+  const pv = state.bt.perVariant;
+  $("varBody").innerHTML = M.VARIANTS.map((v,i)=>`<tr class="${i===state.bt.liveV?"sel":""}"><td>${v.name}${i===state.bt.liveV?" (in use)":""}</td><td class="r mono">${fmtPct(pv[i].week)}</td><td class="r mono">${fmtPct(pv[i].acc)}</td></tr>`).join("");
+}
 // ---------- main screen: target + 15-minute window -> one plain answer ----------
 const TGT_STORE = "btc-next15-target";
 let loadMsg = "Getting prices… the first time takes about 15 seconds.", loadErr = null, WIN = 0;
@@ -780,15 +867,11 @@ function renderTarget(){
   const headline = K == null ? `chance ${span} ends ${a.side.toUpperCase()}` : `chance it's ${a.side} ${fmtUsd(K)} at ${fmtTime(a.w.end)}`;
   const tone = a.chance < 0.55 ? "mid" : (a.side==="up"||a.side==="above") ? "good" : "bad";
   const out = $("tOut");
-  out.innerHTML = `<div class="t-answer ${tone}"><b class="mono"></b><span></span></div><div class="t-bar"><span></span></div><p class="t-detail"></p><p class="t-trust"></p>`;
+  out.innerHTML = `<div class="t-answer ${tone}"><b class="mono"></b><span></span></div><div class="t-bar"><span></span></div><p class="t-detail"></p>`;
   out.querySelector(".t-answer b").textContent = fmtChance(a.chance);
   out.querySelector(".t-answer span").textContent = headline;
   out.querySelector(".t-bar span").style.width = (a.chance*100).toFixed(1) + "%";
   out.querySelector(".t-detail").textContent = a.detail;
-  const bt = state.bt ? M.score(state.bt.rows, 0.5) : null;
-  out.querySelector(".t-trust").textContent = bt
-    ? `How good is this? Over the last 30 days, its up-or-down guesses for 15-minute windows were right ${fmtPct(bt.acc,0)} of the time. A coin flip gets 50%.`
-    : "Checking how well this has done over the last 30 days…";
 }
 function saveGuess(){
   if (!lastAnswer) return;
@@ -799,7 +882,7 @@ function saveGuess(){
   if (same) Object.assign(same, e); else hist.push(e);
   saveHist(hist); renderHistory(hist);
   clearTimeout(nextCheck);
-  nextCheck = setTimeout(async ()=>{ try { renderHistory(await resolveHistory(loadHist())); } catch {} }, Math.max(60000, a.w.end + 70000 - Date.now()));
+  nextCheck = setTimeout(async ()=>{ try { renderHistory(await resolveHistory(loadHist())); renderRecord(); } catch {} }, Math.max(60000, a.w.end + 70000 - Date.now()));
 }
 $("tChips").addEventListener("click", e=>{
   const b = e.target.closest("button[data-w]"); if (!b) return;

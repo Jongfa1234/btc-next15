@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v5RenQcgVbqQdGoTgdUm1wttEoVrFNwdKoKo4k5wkq8=' 'sha256-WKJbBdzYqwapuF2NH3R5IiNZxgJ+aG23FeFs0zYqAxY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -292,7 +294,14 @@ const fmtPct = (x,d=1)=> isNaN(x) ? "–" : (x*100).toFixed(d)+"%";
 const fmtTime = (ms)=> new Date(ms).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
 const fmtDay = (ms)=> new Date(ms).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 const STORE = "btc-next15-history-v1", TH_STORE = "btc-next15-threshold";
-const loadHist = ()=>{ try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
+// Only accept well-formed entries from storage, so tampered data can't inject markup.
+const WORDS = new Set(["No call","Leaning up","Leaning down","Likely up","Likely down","Too close to call","Slightly up","Slightly down"]);
+const num = (x)=> typeof x==="number" && isFinite(x) ? x : null;
+const cleanEntry = (h)=> h && typeof h==="object" && num(h.t)!=null && num(h.price)!=null && WORDS.has(h.word) && ["up","down","flat"].includes(h.dir) ? {
+  t:h.t, price:h.price, p:num(h.p), th:num(h.th), dir:h.dir, word:h.word, later:num(h.later),
+  right: h.right===true||h.right===false ? h.right : null, expired: h.expired===true,
+  flow: h.flow && num(h.flow.book)!=null && num(h.flow.tape)!=null ? {book:h.flow.book, tape:h.flow.tape} : null } : null;
+const loadHist = ()=>{ try { const a = JSON.parse(localStorage.getItem(STORE)); return Array.isArray(a) ? a.map(cleanEntry).filter(Boolean) : []; } catch { return []; } };
 const saveHist = (h)=>{ try { localStorage.setItem(STORE, JSON.stringify(h.slice(-300))); } catch {} };
 let TH = 0.55; try { const v = parseFloat(localStorage.getItem(TH_STORE)); if (v>=0.5 && v<=0.6) TH = v; } catch {}
 
@@ -327,7 +336,7 @@ const setStatus = (key, ok, detail) => { status[key] = { ok, detail }; renderSta
 
 // Candle cache so repeat asks only download what's new.
 const CACHE = "btc-next15-candles-v2";
-function loadCache(src){ try { const j = JSON.parse(localStorage.getItem(CACHE)); return j && j.src===src ? j.cs : []; } catch { return []; } }
+function loadCache(src){ try { const j = JSON.parse(localStorage.getItem(CACHE)); return j && j.src===src && Array.isArray(j.cs) ? j.cs.filter(k=>k && ["t","o","h","l","c","v"].every(f=>num(k[f])!=null)).map(k=>({t:k.t,o:k.o,h:k.h,l:k.l,c:k.c,v:k.v,tb:null})) : []; } catch { return []; } }
 function saveCache(src, cs){ try { localStorage.setItem(CACHE, JSON.stringify({src, cs: cs.slice(-8800)})); } catch {} }
 function contiguousTail(cs, step){
   let i = cs.length-1; while (i>0 && cs[i].t - cs[i-1].t <= step*8) i--;
@@ -344,12 +353,12 @@ async function coinbaseCandles(granSec, days, progress, useCache=true){
   let done = 0, failed = 0, lastErr = null;
   // Try the newest page first, so a blocked or offline Coinbase fails fast instead of after every page.
   if (windows.length){ const [s,e] = windows.shift(); const rows = await getJSON(`${CB}/products/BTC-USD/candles?granularity=${granSec}&start=${iso(s)}&end=${iso(e)}`, {tries:2});
-    for (const [t,l,h,o,c,v] of rows) have.set(t*1000, {t:t*1000,o,h,l,c,v,tb:null}); done++; }
+    for (const [t,l,h,o,c,v] of rows) if ([t,l,h,o,c,v].every(x=>isFinite(+x))) have.set(t*1000, {t:t*1000,o:+o,h:+h,l:+l,c:+c,v:+v,tb:null}); done++; }
   for (let i=0;i<windows.length;i+=4){
     await Promise.all(windows.slice(i,i+4).map(async ([s,e])=>{
       try {
         const rows = await getJSON(`${CB}/products/BTC-USD/candles?granularity=${granSec}&start=${iso(s)}&end=${iso(e)}`);
-        for (const [t,l,h,o,c,v] of rows) have.set(t*1000, {t:t*1000,o,h,l,c,v,tb:null});
+        for (const [t,l,h,o,c,v] of rows) if ([t,l,h,o,c,v].every(x=>isFinite(+x))) have.set(t*1000, {t:t*1000,o:+o,h:+h,l:+l,c:+c,v:+v,tb:null});
       } catch (err) { failed++; lastErr = err; }
       if (progress) progress(`Downloading Coinbase candles… ${++done} of ${windows.length+1}`);
     }));

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lEPlJf7jxWdxNU01MfFM1LWMb3jnVC3jMkC3fM2Q7MA=' 'sha256-Hn3gcKYp1QGgMILvY4uMrZCCXD+gzLQITiWs9DEMfFU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lEPlJf7jxWdxNU01MfFM1LWMb3jnVC3jMkC3fM2Q7MA=' 'sha256-YeAEaLli9rtKl3TJXXKnrupI3p5WsnUqblNMdelzjnA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
@@ -96,10 +96,10 @@ details summary{cursor:pointer;font-weight:700}
 .tform input{font:600 18px var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%;min-width:0}
 .tform input::placeholder{font:500 15px var(--display);color:var(--muted)}
 .tform input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
-.seg5{grid-template-columns:repeat(5,1fr)}
-.seg5 button{font:600 13px var(--display)}
-.other{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
-.other input{width:110px}
+.segw{grid-template-columns:repeat(4,1fr)}
+.segw button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;font:600 12px var(--mono);white-space:nowrap;min-width:0}
+.segw button b{font-weight:600;letter-spacing:-.02em}
+.segw button small{font:500 11px var(--display);opacity:.75}
 #tGo{font-size:18px;padding:16px}
 .t-out{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:16px}
 .t-wait{margin:0;color:var(--muted)}
@@ -132,9 +132,8 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
   <section class="card main-card">
     <form id="tForm" class="tform" novalidate>
       <div class="field"><label for="tPrice">Target price</label><input id="tPrice" name="tPrice" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Leave empty for just up or down"></div>
-      <div class="field"><span class="flabel" id="tLbl">How long from now?</span>
-        <div class="seg seg5" id="tChips" role="group" aria-labelledby="tLbl"><button type="button" data-m="5">5 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 hour</button><button type="button" data-m="other">Other</button></div>
-        <div class="other" id="otherRow" hidden><input id="tMins" name="tMins" type="number" min="1" max="240" step="1" value="15" aria-label="Minutes from now"><span>minutes (1 to 240)</span></div>
+      <div class="field"><span class="flabel" id="tLbl">Which 15 minutes?</span>
+        <div class="seg segw" id="tChips" role="group" aria-labelledby="tLbl"><button type="button" data-w="0"></button><button type="button" data-w="1"></button><button type="button" data-w="2"></button><button type="button" data-w="3"></button></div>
       </div>
       <button type="submit" id="tGo">Predict</button>
     </form>
@@ -202,8 +201,8 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
 
   <section class="card">
     <h2>Your track record</h2>
-    <p class="note" style="margin-top:0">Every time you ask, the call and the order-flow readings are saved in this browser and checked 15 minutes later against the real price.</p>
-    <div class="table-wrap"><table><thead><tr><th>Asked</th><th>Call</th><th class="r">Price then</th><th class="r">15 min later</th><th>Result</th></tr></thead><tbody id="histBody"></tbody></table></div>
+    <p class="note" style="margin-top:0">Each time you tap Predict, the guess is saved in this browser and checked against the real price when its window ends.</p>
+    <div class="table-wrap"><table><thead><tr><th>Asked</th><th>Window</th><th>Guess</th><th class="r">Ended at</th><th>Result</th></tr></thead><tbody id="histBody"></tbody></table></div>
     <p class="note" id="histSummary"></p>
   </section>
 
@@ -375,12 +374,11 @@ const fmtUsd = (x)=> "$" + x.toLocaleString("en-US",{minimumFractionDigits:2,max
 const fmtPct = (x,d=1)=> isNaN(x) ? "–" : (x*100).toFixed(d)+"%";
 const fmtTime = (ms)=> new Date(ms).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
 const fmtDay = (ms)=> new Date(ms).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
-const STORE = "btc-next15-history-v1", TH_STORE = "btc-next15-threshold";
+const STORE = "btc-next15-history-v2", TH_STORE = "btc-next15-threshold";
 // Only accept well-formed entries from storage, so tampered data can't inject markup.
-const WORDS = new Set(["No call","Leaning up","Leaning down","Likely up","Likely down","Too close to call","Slightly up","Slightly down"]);
 const num = (x)=> typeof x==="number" && isFinite(x) ? x : null;
-const cleanEntry = (h)=> h && typeof h==="object" && num(h.t)!=null && num(h.price)!=null && WORDS.has(h.word) && ["up","down","flat"].includes(h.dir) ? {
-  t:h.t, price:h.price, p:num(h.p), th:num(h.th), dir:h.dir, word:h.word, later:num(h.later),
+const cleanEntry = (h)=> h && typeof h==="object" && num(h.t)!=null && num(h.start)!=null && num(h.end)!=null && num(h.chance)!=null && ["up","down","above","below"].includes(h.side) ? {
+  t:h.t, start:h.start, end:h.end, K:num(h.K), ref:num(h.ref), side:h.side, chance:h.chance, base:num(h.base), later:num(h.later),
   right: h.right===true||h.right===false ? h.right : null, expired: h.expired===true,
   flow: h.flow && num(h.flow.book)!=null && num(h.flow.tape)!=null ? {book:h.flow.book, tape:h.flow.tape} : null } : null;
 const loadHist = ()=>{ try { const a = JSON.parse(localStorage.getItem(STORE)); return Array.isArray(a) ? a.map(cleanEntry).filter(Boolean) : []; } catch { return []; } };
@@ -632,33 +630,37 @@ function priceAt(ms, minute){
   for (const k of minute){ if (k.t + 60000 <= ms + 1000) best = k; else break; }
   return best && ms - (best.t+60000) < 3*60000 ? best.c : null;
 }
+const fmtWin = (s,e)=> `${fmtTime(s).replace(/\s?[AP]M$/i,"")}–${fmtTime(e)}`;
+function guessText(h){
+  const pct = ` (${Math.round(h.chance*100)}%)`;
+  return h.K==null ? (h.side==="up" ? "Up" : "Down") + pct : (h.side==="above" ? "Above " : "Below ") + fmtUsd(h.K) + pct;
+}
 function renderHistory(hist){
   const rows = hist.slice().reverse().slice(0, 20);
   $("histBody").innerHTML = rows.length ? rows.map(h=>{
     let res = "Waiting";
     if (h.right === true) res = '<span class="ok-t">Right</span>';
     else if (h.right === false) res = '<span class="bad-t">Wrong</span>';
-    else if (h.dir === "flat" && h.later != null) res = "No call";
     else if (h.expired) res = "Couldn't check";
-    return `<tr><td>${fmtDay(h.t)}</td><td>${h.word}</td><td class="r mono">${fmtUsd(h.price)}</td><td class="r mono">${h.later!=null?fmtUsd(h.later):"–"}</td><td>${res}</td></tr>`;
-  }).join("") : `<tr><td colspan="5" class="note">No calls yet. Your first one is saved when the page finishes loading.</td></tr>`;
+    return `<tr><td>${fmtDay(h.t)}</td><td class="mono">${fmtWin(h.start,h.end)}</td><td>${guessText(h)}</td><td class="r mono">${h.later!=null?fmtUsd(h.later):"–"}</td><td>${res}</td></tr>`;
+  }).join("") : `<tr><td colspan="5" class="note">Nothing yet. Each time you tap Predict, the guess is saved here and checked when its window ends.</td></tr>`;
   const done = hist.filter(h=>h.right===true||h.right===false);
-  let txt = done.length ? `Right ${done.filter(h=>h.right).length} of ${done.length} checked calls (${fmtPct(done.filter(h=>h.right).length/done.length)}).` : "";
-  const withFlow = hist.filter(h=>h.later!=null && h.flow && Math.abs(h.flow.book) > 0.2);
+  let txt = done.length ? `Right ${done.filter(h=>h.right).length} of ${done.length} checked guesses (${fmtPct(done.filter(h=>h.right).length/done.length)}).` : "";
+  const withFlow = hist.filter(h=>h.later!=null && h.base!=null && h.K==null && h.flow && Math.abs(h.flow.book) > 0.2);
   if (withFlow.length >= 5){
-    const agree = withFlow.filter(h=>(h.flow.book>0)===(h.later>h.price)).length;
-    txt += ` When the order book leaned clearly one way, the price followed it ${agree} of ${withFlow.length} times.`;
+    const agree = withFlow.filter(h=>(h.flow.book>0)===(h.later>h.base)).length;
+    txt += ` When the order book leaned clearly one way, the window went that way ${agree} of ${withFlow.length} times.`;
   }
   $("histSummary").textContent = txt;
 }
 async function resolveHistory(hist){
-  const pending = hist.filter(h=>h.later==null && !h.expired && Date.now() >= h.t + 15*60000);
+  const pending = hist.filter(h=>h.later==null && !h.expired && Date.now() >= h.end + 60000);
   if (!pending.length) return hist;
   const minute = await oneMinuteCandles();
   for (const h of pending){
-    const later = priceAt(h.t + 15*60000, minute);
-    if (later != null){ h.later = later; h.right = h.dir==="flat" ? null : (h.dir==="up") === (later > h.price); }
-    else if (Date.now() - h.t > 4*3600000) h.expired = true;
+    const later = priceAt(h.end, minute), base = h.K ?? h.ref ?? priceAt(h.start, minute);
+    if (later != null && base != null){ h.later = later; h.base = base; h.right = (h.side==="up"||h.side==="above") === (later > base); }
+    else if (Date.now() - h.end > 4*3600000) h.expired = true;
   }
   saveHist(hist);
   return hist;
@@ -694,12 +696,10 @@ async function ask(){
     const live = M.liveCall([...closed, liveCandle], ctx);
     const sig = src + (ctx.funding?"f":"") + (ctx.premium?"p":"") + (closed[0].tb!=null?"t":"");
     const reuse = !!(state && state.bt && state.sig===sig && now - state.btAt < 6*3600000);
-    state = { live, price, src, sig, cs, closedN: closed.length, ctx, flow, askedAt: now, bt: reuse ? state.bt : null, btAt: reuse ? state.btAt : now };
+    state = { live, price, open: cur ? cur.o : price, src, sig, cs, closedN: closed.length, ctx, flow, askedAt: now, bt: reuse ? state.bt : null, btAt: reuse ? state.btAt : now };
     state.moves = M.moveStats(closed);
     renderCall(); renderStatus(); renderFlow(); renderTarget();
     let hist = loadHist();
-    hist.push({ t: now, price, p: live.p, th: TH, dir: M.label(live.p, TH).dir, word: M.label(live.p, TH).word, later: null, right: null, flow: flow ? { book: flow.book, tape: flow.tape } : null });
-    saveHist(hist);
     renderHistory(hist);
     if (!state.bt){
       $("btNote").textContent = "Running the out-of-sample test…";
@@ -708,7 +708,6 @@ async function ask(){
     renderBacktest(); renderTarget();
     try { hist = await resolveHistory(hist); renderHistory(hist); } catch (e) { console.error(e); }
     clearTimeout(nextCheck);
-    nextCheck = setTimeout(async ()=>{ try { renderHistory(await resolveHistory(loadHist())); } catch {} }, 16*60000);
     return true;
   } catch (e) {
     console.error(e);
@@ -725,71 +724,97 @@ async function ask(){
   }
 }
 $("ask").addEventListener("click", ask);
-// ---------- main screen: target + time frame -> one plain answer ----------
+// ---------- main screen: target + 15-minute window -> one plain answer ----------
 const TGT_STORE = "btc-next15-target";
-let loadMsg = "Getting prices… the first time takes about 15 seconds.", loadErr = null;
+let loadMsg = "Getting prices… the first time takes about 15 seconds.", loadErr = null, WIN = 0;
 const fmtChance = (x)=> x < 0.01 ? "Under 1%" : x > 0.99 ? "Over 99%" : Math.round(x*100) + "%";
-const fmtSpan = (m)=> m === 60 ? "1 hour" : m % 60 === 0 ? `${m/60} hours` : m > 60 ? `${Math.floor(m/60)} h ${m%60} min` : `${m} min`;
 function parsePrice(t){
   t = String(t).trim().toLowerCase().replace(/[$,\s]/g, "");
   const m = t.match(/^(\d+(?:\.\d+)?)(k?)$/); if (!m) return NaN;
   return parseFloat(m[1]) * (m[2] ? 1000 : 1);
 }
-function setMins(v, other){
-  v = Math.round(+v);
-  const quick = [5,15,30,60].includes(v) && !other;
-  if (v >= 1 && v <= 240) $("tMins").value = v;
-  $("otherRow").hidden = quick;
-  for (const b of $("tChips").querySelectorAll("button")) b.setAttribute("aria-pressed", String(quick ? +b.dataset.m === v : b.dataset.m === "other"));
+// Clock-aligned 15-minute windows: the one we're in now, then the next three.
+function windows(){ const s0 = Math.floor(Date.now()/M.Q)*M.Q; return [0,1,2,3].map(i=>({ start: s0+i*M.Q, end: s0+(i+1)*M.Q })); }
+function renderChips(){
+  const ws = windows(), left = Math.max(1, Math.ceil((ws[0].end - Date.now())/60000));
+  $("tChips").querySelectorAll("button").forEach((b,i)=>{
+    b.setAttribute("aria-pressed", String(i===WIN));
+    b.innerHTML = `<b></b><small></small>`;
+    b.firstChild.textContent = fmtWin(ws[i].start, ws[i].end).replace(/\s?[AP]M$/i,"");
+    b.lastChild.textContent = i===0 ? `now, ${left}m left` : i===1 ? "next" : `in ${Math.round((ws[i].start-Date.now())/60000)} min`;
+  });
 }
 function showOut(cls, text){ const out = $("tOut"); out.innerHTML = `<p class="${cls}"></p>`; out.firstChild.textContent = text; }
+// Works out the answer for window index i and target K (null = up or down for that window).
+function windowAnswer(i, K){
+  const w = windows()[i], now = Date.now(), S = state.price, st = state.moves, p = state.live.p;
+  const toEnd = Math.max(0.25, (w.end - now)/60000);
+  if (K == null){
+    if (i === 0){ // already started: will it end above where it opened?
+      const r = M.target(st, S, state.open, 0.5, toEnd), up = r.above >= 0.5;
+      return { w, side: up?"up":"down", chance: up?r.above:r.below, ref: state.open,
+        detail: `This window opened at ${fmtUsd(state.open)} and it's ${fmtUsd(S)} now (${S>=state.open?"+":""}${fmtUsd(S-state.open).replace("$-","-$")}). "Up" means the ${fmtTime(w.end)} price is above ${fmtUsd(state.open)}.` };
+    }
+    const pw = 0.5 + (p-0.5)/Math.pow(2, i-1), up = pw >= 0.5; // the model's lean fades for windows further out
+    return { w, side: up?"up":"down", chance: up?pw:1-pw, ref: null,
+      detail: `"Up" means the ${fmtTime(w.end)} price ends above the ${fmtTime(w.start)} price. It's ${fmtUsd(S)} now.` };
+  }
+  const r = M.target(st, S, K, i===0 ? 0.5 : p, toEnd), above = K >= S;
+  return { w, side: above?"above":"below", chance: above?r.above:r.below, ref: null,
+    detail: `It's ${fmtUsd(S)} now. Chance it hits ${fmtUsd(K)} at any point before ${fmtTime(w.end)}: ${fmtChance(r.touch).toLowerCase()}.` };
+}
+let lastAnswer = null;
 function renderTarget(){
-  if (!state){ return loadErr ? showOut("err", loadErr) : showOut("t-wait", loadMsg); }
-  const raw = $("tPrice").value.trim(), mins = Math.round(+$("tMins").value), S = state.price;
-  if (!(mins >= 1 && mins <= 240)) return showOut("err", "Pick a time from 1 to 240 minutes.");
-  let K = S;
+  renderChips();
+  if (!state){ lastAnswer = null; return loadErr ? showOut("err", loadErr) : showOut("t-wait", loadMsg); }
+  const raw = $("tPrice").value.trim(), S = state.price;
+  let K = null;
   if (raw){
     K = parsePrice(raw);
     if (!(K > 0)) return showOut("err", "Type a price like 92000, 92,000 or 92k.");
     if (K < S*0.5 || K > S*2) return showOut("err", `That's very far from the current price of ${fmtUsd(S)}. Try a price closer to it.`);
   }
-  try { localStorage.setItem(TGT_STORE, JSON.stringify({ k: raw ? K : null, m: mins })); } catch {}
-  const r = M.target(state.moves, S, K, state.live.p, mins), span = fmtSpan(mins), at = fmtTime(Date.now() + mins*60000);
-  let chance, headline, detail;
-  if (!raw){
-    const up = r.above >= 0.5; chance = up ? r.above : r.below;
-    headline = `chance it's ${up ? "higher" : "lower"} in ${span}`;
-    detail = `Right now it's ${fmtUsd(S)}. By ${at} it will most likely be between ${fmtUsd(r.band[0])} and ${fmtUsd(r.band[1])}.`;
-  } else {
-    const above = K >= S; chance = above ? r.above : r.below;
-    headline = `chance it's ${above ? "above" : "below"} ${fmtUsd(K)} in ${span}`;
-    detail = `Right now it's ${fmtUsd(S)}. Chance it hits ${fmtUsd(K)} at any point before ${at}: ${fmtChance(r.touch).toLowerCase()}.`;
-  }
-  const goingUp = raw ? (K >= S) === (chance >= 0.5) ? K >= S : K < S : r.above >= 0.5;
-  const tone = chance < 0.55 ? "mid" : goingUp ? "good" : "bad";
+  try { localStorage.setItem(TGT_STORE, JSON.stringify({ k: K })); } catch {}
+  const a = windowAnswer(WIN, K); lastAnswer = { ...a, K };
+  const span = fmtWin(a.w.start, a.w.end);
+  const headline = K == null ? `chance ${span} ends ${a.side.toUpperCase()}` : `chance it's ${a.side} ${fmtUsd(K)} at ${fmtTime(a.w.end)}`;
+  const tone = a.chance < 0.55 ? "mid" : (a.side==="up"||a.side==="above") ? "good" : "bad";
   const out = $("tOut");
   out.innerHTML = `<div class="t-answer ${tone}"><b class="mono"></b><span></span></div><div class="t-bar"><span></span></div><p class="t-detail"></p><p class="t-trust"></p>`;
-  out.querySelector(".t-answer b").textContent = fmtChance(chance);
+  out.querySelector(".t-answer b").textContent = fmtChance(a.chance);
   out.querySelector(".t-answer span").textContent = headline;
-  out.querySelector(".t-bar span").style.width = (chance*100).toFixed(1) + "%";
-  out.querySelector(".t-detail").textContent = detail;
+  out.querySelector(".t-bar span").style.width = (a.chance*100).toFixed(1) + "%";
+  out.querySelector(".t-detail").textContent = a.detail;
   const bt = state.bt ? M.score(state.bt.rows, 0.5) : null;
   out.querySelector(".t-trust").textContent = bt
-    ? `How good is this? Over the last 30 days, its up-or-down guesses were right ${fmtPct(bt.acc,0)} of the time. A coin flip gets 50%.`
+    ? `How good is this? Over the last 30 days, its up-or-down guesses for 15-minute windows were right ${fmtPct(bt.acc,0)} of the time. A coin flip gets 50%.`
     : "Checking how well this has done over the last 30 days…";
 }
+function saveGuess(){
+  if (!lastAnswer) return;
+  const a = lastAnswer, hist = loadHist();
+  const same = hist.find(h=>h.start===a.w.start && h.K===a.K && h.later==null);
+  const e = { t: Date.now(), start: a.w.start, end: a.w.end, K: a.K, ref: a.ref, side: a.side, chance: a.chance, base: null, later: null, right: null,
+              flow: state.flow ? { book: state.flow.book, tape: state.flow.tape } : null };
+  if (same) Object.assign(same, e); else hist.push(e);
+  saveHist(hist); renderHistory(hist);
+  clearTimeout(nextCheck);
+  nextCheck = setTimeout(async ()=>{ try { renderHistory(await resolveHistory(loadHist())); } catch {} }, Math.max(60000, a.w.end + 70000 - Date.now()));
+}
 $("tChips").addEventListener("click", e=>{
-  const b = e.target.closest("button[data-m]"); if (!b) return;
-  if (b.dataset.m === "other"){ setMins($("tMins").value, true); $("tMins").focus(); } else setMins(+b.dataset.m);
-  renderTarget();
+  const b = e.target.closest("button[data-w]"); if (!b) return;
+  WIN = +b.dataset.w; renderTarget();
 });
-$("tMins").addEventListener("input", ()=>{ if (+$("tMins").value >= 1) renderTarget(); });
 $("tForm").addEventListener("submit", async e=>{
   e.preventDefault();
   if (!state || Date.now() - state.askedAt > 60000){ loadMsg = "Getting the latest price…"; if (state) showOut("t-wait", loadMsg); if (await ask() === false) return; }
-  renderTarget();
+  renderTarget(); saveGuess();
 });
-try { const j = JSON.parse(localStorage.getItem(TGT_STORE)); if (j && j.k > 0 && isFinite(j.k)) $("tPrice").value = String(Math.round(j.k*100)/100); setMins(j && j.m >= 1 && j.m <= 240 ? j.m : 15); } catch { setMins(15); }
+// Keep the window labels current; when a window ends, move the picker along with the clock.
+let lastStart = windows()[0].start;
+setInterval(()=>{ const s = windows()[0].start; if (s !== lastStart){ lastStart = s; WIN = Math.max(0, WIN-1); if (state) renderTarget(); } renderChips(); }, 15000);
+try { const j = JSON.parse(localStorage.getItem(TGT_STORE)); if (j && j.k > 0 && isFinite(j.k)) $("tPrice").value = String(Math.round(j.k*100)/100); } catch {}
+renderChips();
 setTH(TH);
 renderHistory(loadHist());
 ask();

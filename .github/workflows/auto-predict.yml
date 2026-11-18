@@ -1,0 +1,51 @@
+name: Auto predictions
+
+# Makes a prediction for each 15-minute window and checks finished ones, even when nobody has the app open.
+# GitHub runs scheduled jobs on a best-effort basis, so a run can start a few minutes late.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-predict
+  cancel-in-progress: false
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Open the log branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin data >/dev/null; then
+            git fetch --depth=1 origin data
+            git worktree add -B data "$RUNNER_TEMP/data" origin/data
+          else
+            git worktree add --orphan -b data "$RUNNER_TEMP/data"
+          fi
+
+      - name: Predict and check
+        run: node tools/predict.mjs "$RUNNER_TEMP/data/log.json"
+
+      - name: Save the log
+        working-directory: ${{ runner.temp }}/data
+        run: |
+          git add log.json
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -q -m "Update prediction log"
+          git push origin data

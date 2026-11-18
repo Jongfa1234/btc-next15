@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H0e6rRV7XvLCTNULRkc2y5m+ennEEGxliXO+sFwJKN8=' 'sha256-inT0psz1crG5UmiWQdCHnf3YuNT9RFEbH7V94zPaNcA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://external-api.kalshi.com https://api.elections.kalshi.com https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v1VblMk2YM07NMgfaMS0wUpIBzJBa3zstgTu8tol9nQ=' 'sha256-YUlNOabb5H2Fx5oIMqLWKMjshU9sXdCahmtKmmiDnPQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://raw.githubusercontent.com https://external-api.kalshi.com https://api.elections.kalshi.com https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
@@ -112,7 +112,7 @@ details summary{cursor:pointer;font-weight:700}
 .t-bar span{display:block;height:100%;background:var(--fg)}
 .t-answer.good + .t-bar span{background:var(--up)} .t-answer.bad + .t-bar span{background:var(--down)}
 .t-best{margin:0;font-size:18px;font-weight:700;line-height:1.35}
-.pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;background:var(--bg);color:var(--fg);border:2px solid var(--line);border-radius:12px;padding:12px;min-width:0;font:600 14px var(--display)}
 .side .s-name{font-size:14px;font-weight:700;overflow-wrap:anywhere}
 .side b{font-size:30px;font-weight:600;line-height:1.05}
@@ -121,6 +121,13 @@ details summary{cursor:pointer;font-weight:700}
 .side[aria-pressed="true"]{border-color:var(--fg);background:var(--surface)}
 .side.best small{color:var(--fg);font-weight:700}
 .side.best{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.side.sk b{color:var(--muted)}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.checks li{display:grid;grid-template-columns:18px 1fr;gap:6px;align-items:start}
+.checks li::before{font-weight:800;text-align:center}
+.checks li.ok::before{content:"\2713";color:var(--up)}
+.checks li.no::before{content:"\2715";color:var(--down)}
+.side b{font-size:26px}
 .t-crowd{margin:0;font-size:13px;color:var(--muted)}
 .t-detail{margin:0;font-size:14px}
 .rec{display:flex;flex-direction:column;gap:12px}
@@ -174,6 +181,7 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
     <div class="rec-strip" id="recStrip" aria-hidden="true"></div>
     <ul class="rec-list" id="recList"></ul>
     <p class="note" id="recNote"></p>
+    <p class="note auto" id="autoNote"></p>
     <p class="note">How it improves: every day it checks this record, switches to whichever of its 3 setups has been most accurate over the past week, and corrects its percentages so that "60%" really comes true about 60% of the time.</p>
   </section>
 
@@ -452,6 +460,17 @@ M.target = (st, S, K, p, mins) => {
   const band = [1/6, 5/6].map(q => S*Math.exp((M.quantile(st.z, q) + shift)*sig));
   return { above, below, touch, x, band, movePct: sig };
 };
+// Play or skip: all three must pass. bestP = chance of the likelier side, past = M.score(...) at the matching
+// confidence level, price = Robinhood's price (0-1) for that side, or null.
+M.FEE = 0.02;
+M.playTh = (bestP)=> bestP >= 0.6 ? 0.6 : bestP >= 0.58 ? 0.58 : 0.55;
+M.playCheck = (bestP, past, price) => {
+  const leans = bestP >= 0.55;
+  const proven = !!past && past.calls >= 50 && past.acc - 0.5 > past.luck;
+  const worth = Math.min(bestP, past && past.calls >= 50 ? past.acc : bestP);
+  const value = price != null && leans && worth - price - M.FEE >= 0.03;
+  return { leans, proven: leans && proven, value, worth, play: leans && proven && value };
+};
 if (typeof module !== "undefined") module.exports = M;
 </script>
 
@@ -466,7 +485,7 @@ const STORE = "btc-next15-history-v2", TH_STORE = "btc-next15-threshold";
 // Only accept well-formed entries from storage, so tampered data can't inject markup.
 const num = (x)=> typeof x==="number" && isFinite(x) ? x : null;
 const cleanEntry = (h)=> h && typeof h==="object" && num(h.t)!=null && num(h.start)!=null && num(h.end)!=null && num(h.chance)!=null && ["up","down","above","below"].includes(h.side) ? {
-  t:h.t, start:h.start, end:h.end, K:num(h.K), ref:num(h.ref), side:h.side, chance:h.chance, base:num(h.base), later:num(h.later),
+  t:h.t, start:h.start, end:h.end, K:num(h.K), ref:num(h.ref), side:h.side, chance:h.chance, play: h.play===true, base:num(h.base), later:num(h.later),
   right: h.right===true||h.right===false ? h.right : null, expired: h.expired===true,
   flow: h.flow && num(h.flow.book)!=null && num(h.flow.tape)!=null ? {book:h.flow.book, tape:h.flow.tape} : null } : null;
 const loadHist = ()=>{ try { const a = JSON.parse(localStorage.getItem(STORE)); return Array.isArray(a) ? a.map(cleanEntry).filter(Boolean) : []; } catch { return []; } };
@@ -498,7 +517,7 @@ async function getJSON(url, {timeout=10000, tries=3}={}){
 }
 
 // Status of every source, shown on the page.
-const SOURCES = { candles:"Price history", flowHist:"Trade flow history", funding:"Funding rate", premium:"Futures premium", live:"Live order book", check:"15-minute check", kalshi:"Robinhood target" };
+const SOURCES = { candles:"Price history", flowHist:"Trade flow history", funding:"Funding rate", premium:"Futures premium", live:"Live order book", check:"15-minute check", kalshi:"Robinhood target", autolog:"Automatic predictions" };
 const status = {};
 const setStatus = (key, ok, detail) => { status[key] = { ok, detail }; renderStatus(); };
 
@@ -770,7 +789,7 @@ async function ask(){
     let { cs, src } = await getCandles(progress);
     const days = Math.ceil((Date.now()-cs[0].t)/864e5);
     progress("Almost there…");
-    const [csFlow, funding, premium, flow] = await Promise.all([addTradeFlow(cs, src), getFunding(days+2), getPremium(days, cs.length), liveFlow(), loadKalshi()]);
+    const [csFlow, funding, premium, flow] = await Promise.all([addTradeFlow(cs, src), getFunding(days+2), getPremium(days, cs.length), liveFlow(), loadKalshi(), loadAutoLog()]);
     cs = csFlow;
     const ctx = { funding, premium };
     const now = Date.now(), closed = cs.filter(k => k.t + M.Q <= now), cur = cs.find(k => k.t + M.Q > now);
@@ -833,6 +852,39 @@ async function loadKalshi(){
 }
 const rhMarket = (w)=> kal.markets.find(m=>Math.abs(m.end - w.end) < 60000) || null;
 const crowd = (m)=> m.bid && m.ask ? (m.bid + m.ask)/2 : m.last;
+// ---------- automatic predictions: made every 15 minutes by a scheduled GitHub job, even with the app closed ----------
+const AUTO_URL = "https://raw.githubusercontent.com/Jongfa1234/btc-next15/data/log.json";
+let autoLog = null;
+async function loadAutoLog(){
+  try {
+    const j = await getJSON(AUTO_URL + "?t=" + Math.floor(Date.now()/60000), { timeout: 8000, tries: 1 });
+    const es = (Array.isArray(j.entries) ? j.entries : []).filter(e=>e && num(e.start)!=null && num(e.pUp)!=null)
+      .map(e=>({ start:e.start, pUp:e.pUp, right: e.right===true||e.right===false ? e.right : null, strike:num(e.strike), crowd:num(e.crowd),
+                 rightVsStrike: e.rightVsStrike===true||e.rightVsStrike===false ? e.rightVsStrike : null, crowdRight: e.crowdRight===true||e.crowdRight===false ? e.crowdRight : null,
+                 follow: e.follow && typeof e.follow==='object' ? { play: e.follow.play===true, won: e.follow.won===true||e.follow.won===false ? e.follow.won : null, pnl: num(e.follow.pnl) } : null }));
+    autoLog = { entries: es, updated: Date.parse(j.summary && j.summary.updated) };
+    setStatus("autolog", true, `${es.length} logged`);
+  } catch (e) {
+    autoLog = null;
+    setStatus("autolog", false, /404/.test(e.message) ? "The automatic job hasn't saved its first prediction yet." : e.message);
+  }
+}
+function renderAutoLog(){
+  const el = $("autoNote");
+  if (!autoLog || !autoLog.entries.length){ el.textContent = "Automatic predictions: a job now makes a prediction every 15 minutes, even when the app is closed. Its first results show up here within about half an hour."; return; }
+  const done = autoLog.entries.filter(e=>e.right!=null), right = done.filter(e=>e.right).length;
+  const rh = done.filter(e=>e.crowdRight!=null);
+  let t = `Automatic predictions (made every 15 minutes, even with the app closed): ${done.length ? `right ${right} of ${done.length} (${fmtPct(right/done.length,0)})` : "none checked yet"}.`;
+  if (rh.length >= 5) t += ` On the same windows, Robinhood traders' favourite won ${rh.filter(e=>e.crowdRight).length} of ${rh.length}, and the app ${rh.filter(e=>e.rightVsStrike).length} of ${rh.length}.`;
+  const fol = autoLog.entries.filter(e=>e.follow), plays = fol.filter(e=>e.follow.play && e.follow.pnl!=null);
+  if (fol.length){
+    const pnl = plays.reduce((a,e)=>a+e.follow.pnl, 0);
+    t += ` Following every best call automatically: it said Play on ${fol.filter(e=>e.follow.play).length} of ${fol.length} windows` +
+      (plays.length ? `, won ${plays.filter(e=>e.follow.won).length} of ${plays.length} checked, ${pnl>=0?"up":"down"} about $${Math.abs(pnl).toFixed(2)} per $1 contract after estimated fees.` : ".");
+  }
+  if (done.length && done.length < 200) t += " It takes a few hundred windows before this means much.";
+  el.textContent = t;
+}
 // ---------- its record: right or wrong for every 15-minute window ----------
 function renderRecord(){
   if (!state || !state.bt) return;
@@ -848,7 +900,9 @@ function renderRecord(){
   $("recList").innerHTML = li.join("");
   const all = M.score(rows, 0.5), mine = loadHist().filter(h=>h.right===true||h.right===false);
   $("recNote").textContent = `Last 30 days: right ${fmtPct(all.acc,0)} of ${rows.length.toLocaleString()} windows. A coin flip gets 50%.` +
-    (mine.length ? ` Your saved guesses: ${mine.filter(h=>h.right).length} of ${mine.length} right.` : "");
+    (mine.length ? ` Your saved guesses: ${mine.filter(h=>h.right).length} of ${mine.length} right.` : "") +
+    (mine.some(h=>h.play) ? ` When it said Play: ${mine.filter(h=>h.play&&h.right).length} of ${mine.filter(h=>h.play).length} right.` : "");
+  renderAutoLog();
   const pv = state.bt.perVariant;
   $("varBody").innerHTML = M.VARIANTS.map((v,i)=>`<tr class="${i===state.bt.liveV?"sel":""}"><td>${v.name}${i===state.bt.liveV?" (in use)":""}</td><td class="r mono">${fmtPct(pv[i].week)}</td><td class="r mono">${fmtPct(pv[i].acc)}</td></tr>`).join("");
 }
@@ -925,36 +979,50 @@ function renderTarget(){
   const best = pHi >= 0.5 ? hiSide : loSide, bestP = Math.max(pHi, 1-pHi), close = bestP < 0.55;
   const key = `${a.w.start}|${K}`;
   if (pickKey !== key){ pickKey = key; pickSide = null; }
-  const sel = pickSide || best, selP = sel===hiSide ? pHi : 1-pHi;
-  lastAnswer = { ...a, K, side: sel, chance: selP };
   const word = (s)=> s[0].toUpperCase()+s.slice(1);
   const what = K == null ? "" : ` ${fmtUsd(K)}`, when = K == null ? `for ${fmtWin(a.w.start, a.w.end)}` : `at ${fmtTime(a.w.end)}`;
   const c = rh ? crowd(rh) : null;
+  // Play or skip, based on data: three checks that must all pass (same rule as the automatic job).
+  const th = M.playTh(bestP), past = state.bt ? M.score(state.bt.rows, th) : null;
+  const price = rh && c ? (best===hiSide ? c : 1-c) : null;
+  const pc = M.playCheck(bestP, past, price), checks = [];
+  checks.push(pc.leans ? { ok:true, text:`It leans clearly ${word(best)} (${fmtChance(bestP)}).` } : { ok:false, text:`It's close to a coin flip (${fmtChance(bestP)} for ${word(best)}).` });
+  checks.push(past && past.calls >= 50
+    ? { ok: pc.proven, text:`When it was at least ${Math.round(th*100)}% sure over the last 30 days, it was right ${fmtPct(past.acc,0)} of ${past.calls} times` + (past.acc - 0.5 > past.luck ? "." : ", which could just be luck.") }
+    : { ok:false, text:"It hasn't been this sure often enough lately to prove it's reliable." });
+  checks.push(price == null
+    ? { ok:false, text:"No Robinhood price to compare, so it can't tell whether a bet is worth it. Turn on Robinhood's target." }
+    : { ok: pc.value, text: pc.value
+      ? `Robinhood charges ${Math.round(price*100)}¢ for ${word(best)}, below what its chance is worth (about ${Math.round(pc.worth*100)}¢).`
+      : `Robinhood charges ${Math.round(price*100)}¢ for ${word(best)}, which leaves no real edge over its ${Math.round(pc.worth*100)}¢ estimate.` });
+  const play = pc.play;
+  const rec = play ? best : "skip";
+  const sel = pickSide || rec, selP = sel==="skip" ? null : sel===hiSide ? pHi : 1-pHi;
+  lastAnswer = { ...a, K, side: sel==="skip" ? best : sel, chance: sel==="skip" ? bestP : selP, play, skip: sel==="skip" };
   const out = $("tOut");
-  out.innerHTML = `<p class="t-best"></p><div class="pick" role="group" aria-label="Choose a side"></div><p class="t-detail"></p><p class="t-crowd" hidden></p>`;
-  out.querySelector(".t-best").textContent = close
-    ? `Too close to call: ${Math.round(pHi*100)}% vs ${Math.round((1-pHi)*100)}%. It's nearly a coin flip, so skipping this one is reasonable.`
-    : `Best call: ${word(best).toUpperCase()}${what} ${when}. ${fmtChance(bestP)} likely.`;
+  out.innerHTML = `<p class="t-best"></p><div class="pick" role="group" aria-label="Choose"></div><ul class="checks"></ul><p class="t-detail"></p><p class="t-crowd" hidden></p>`;
+  out.querySelector(".t-best").textContent = play
+    ? `Best call: PLAY ${word(best).toUpperCase()}${what} ${when}. ${fmtChance(bestP)} likely.`
+    : `Best call: SKIP this one. It leans ${word(best)}${what} (${fmtChance(bestP)}), but not every check passed.`;
   const pick = out.querySelector(".pick");
-  for (const [side, p] of [[hiSide, pHi], [loSide, 1-pHi]]){
+  for (const [side, p] of [[hiSide, pHi], [loSide, 1-pHi], ["skip", null]]){
     const b = document.createElement("button");
     b.type = "button"; b.dataset.side = side;
-    b.className = `side ${side===hiSide?"hi":"lo"}${side===best && !close ? " best" : ""}`;
+    b.className = `side ${side==="skip"?"sk":side===hiSide?"hi":"lo"}${side===rec ? " best" : ""}`;
     b.setAttribute("aria-pressed", String(side===sel));
     b.innerHTML = `<span class="s-name"></span><b class="mono"></b><small></small>`;
-    b.querySelector(".s-name").textContent = word(side) + what;
-    b.querySelector("b").textContent = fmtChance(p);
-    b.querySelector("small").textContent = side===best && !close ? "Best call" : rh && c ? `Robinhood: ${Math.round((side===hiSide?c:1-c)*100)}¢` : "";
-    if (side===best && !close && rh && c) b.querySelector("small").textContent = `Best call · Robinhood: ${Math.round((side===hiSide?c:1-c)*100)}¢`;
+    b.querySelector(".s-name").textContent = side==="skip" ? "Don't play" : word(side);
+    b.querySelector("b").textContent = side==="skip" ? "Skip" : fmtChance(p);
+    const rp = rh && c && side!=="skip" ? `Robinhood ${Math.round((side===hiSide?c:1-c)*100)}¢` : "";
+    b.querySelector("small").textContent = side===rec ? (rp ? `Best call · ${rp}` : "Best call") : rp;
     pick.appendChild(b);
   }
+  out.querySelector(".checks").innerHTML = checks.map(()=>`<li><span></span></li>`).join("");
+  out.querySelectorAll(".checks li").forEach((li,i)=>{ li.className = checks[i].ok ? "ok" : "no"; li.firstChild.textContent = checks[i].text; });
   out.querySelector(".t-detail").textContent = a.detail;
   if (rh && c){
     const cp = out.querySelector(".t-crowd"); cp.hidden = false;
-    const edge = (best===hiSide ? pHi - c : (1-pHi) - (1-c));
-    cp.textContent = `Robinhood traders put "above" at ${Math.round(c*100)}%. ` + (close ? "" : Math.abs(edge) < 0.05
-      ? `The app roughly agrees with them on ${word(best)}.`
-      : edge > 0 ? `The app is more confident in ${word(best)} than they are.` : `The app is less confident in ${word(best)} than they are.`);
+    cp.textContent = `Robinhood traders put "above" at ${Math.round(c*100)}%.`;
   }
 }
 let pickKey = null, pickSide = null;
@@ -964,10 +1032,10 @@ $("tOut").addEventListener("click", e=>{
   if (lastAnswer && loadHist().some(h=>h.start===lastAnswer.w.start && h.K===lastAnswer.K && h.later==null)) saveGuess();
 });
 function saveGuess(){
-  if (!lastAnswer) return;
+  if (!lastAnswer || lastAnswer.skip) return;
   const a = lastAnswer, hist = loadHist();
   const same = hist.find(h=>h.start===a.w.start && h.K===a.K && h.later==null);
-  const e = { t: Date.now(), start: a.w.start, end: a.w.end, K: a.K, ref: a.ref, side: a.side, chance: a.chance, base: null, later: null, right: null,
+  const e = { t: Date.now(), start: a.w.start, end: a.w.end, K: a.K, ref: a.ref, side: a.side, chance: a.chance, play: !!a.play, base: null, later: null, right: null,
               flow: state.flow ? { book: state.flow.book, tape: state.flow.tape } : null };
   if (same) Object.assign(same, e); else hist.push(e);
   saveHist(hist); renderHistory(hist);

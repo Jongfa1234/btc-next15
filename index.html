@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H0e6rRV7XvLCTNULRkc2y5m+ennEEGxliXO+sFwJKN8=' 'sha256-UKz47wmolsghxPBwHRcQRymtobMqYX/NPNCZWytEeZI='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://external-api.kalshi.com https://api.elections.kalshi.com https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H0e6rRV7XvLCTNULRkc2y5m+ennEEGxliXO+sFwJKN8=' 'sha256-inT0psz1crG5UmiWQdCHnf3YuNT9RFEbH7V94zPaNcA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://external-api.kalshi.com https://api.elections.kalshi.com https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
@@ -111,6 +111,17 @@ details summary{cursor:pointer;font-weight:700}
 .t-bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
 .t-bar span{display:block;height:100%;background:var(--fg)}
 .t-answer.good + .t-bar span{background:var(--up)} .t-answer.bad + .t-bar span{background:var(--down)}
+.t-best{margin:0;font-size:18px;font-weight:700;line-height:1.35}
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;background:var(--bg);color:var(--fg);border:2px solid var(--line);border-radius:12px;padding:12px;min-width:0;font:600 14px var(--display)}
+.side .s-name{font-size:14px;font-weight:700;overflow-wrap:anywhere}
+.side b{font-size:30px;font-weight:600;line-height:1.05}
+.side small{font-size:12px;color:var(--muted);min-height:1.3em}
+.side.hi b{color:var(--up)} .side.lo b{color:var(--down)}
+.side[aria-pressed="true"]{border-color:var(--fg);background:var(--surface)}
+.side.best small{color:var(--fg);font-weight:700}
+.side.best{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.t-crowd{margin:0;font-size:13px;color:var(--muted)}
 .t-detail{margin:0;font-size:14px}
 .rec{display:flex;flex-direction:column;gap:12px}
 .rec h2{margin:0}
@@ -908,16 +919,50 @@ function renderTarget(){
   }
   try { localStorage.setItem(TGT_STORE, JSON.stringify({ k: useRH ? null : K, rh: useRH })); } catch {}
   const a = windowAnswer(WIN, K, !!rh); lastAnswer = { ...a, K };
-  const span = fmtWin(a.w.start, a.w.end);
-  const headline = K == null ? `chance ${span} ends ${a.side.toUpperCase()}` : `chance it's ${a.side} ${fmtUsd(K)} at ${fmtTime(a.w.end)}`;
-  const tone = a.chance < 0.55 ? "mid" : (a.side==="up"||a.side==="above") ? "good" : "bad";
+  // Both sides, with the app's best call highlighted. The viewer can tap either side.
+  const hiSide = K == null ? "up" : "above", loSide = K == null ? "down" : "below";
+  const pHi = (a.side===hiSide) ? a.chance : 1 - a.chance;
+  const best = pHi >= 0.5 ? hiSide : loSide, bestP = Math.max(pHi, 1-pHi), close = bestP < 0.55;
+  const key = `${a.w.start}|${K}`;
+  if (pickKey !== key){ pickKey = key; pickSide = null; }
+  const sel = pickSide || best, selP = sel===hiSide ? pHi : 1-pHi;
+  lastAnswer = { ...a, K, side: sel, chance: selP };
+  const word = (s)=> s[0].toUpperCase()+s.slice(1);
+  const what = K == null ? "" : ` ${fmtUsd(K)}`, when = K == null ? `for ${fmtWin(a.w.start, a.w.end)}` : `at ${fmtTime(a.w.end)}`;
+  const c = rh ? crowd(rh) : null;
   const out = $("tOut");
-  out.innerHTML = `<div class="t-answer ${tone}"><b class="mono"></b><span></span></div><div class="t-bar"><span></span></div><p class="t-detail"></p>`;
-  out.querySelector(".t-answer b").textContent = fmtChance(a.chance);
-  out.querySelector(".t-answer span").textContent = headline;
-  out.querySelector(".t-bar span").style.width = (a.chance*100).toFixed(1) + "%";
+  out.innerHTML = `<p class="t-best"></p><div class="pick" role="group" aria-label="Choose a side"></div><p class="t-detail"></p><p class="t-crowd" hidden></p>`;
+  out.querySelector(".t-best").textContent = close
+    ? `Too close to call: ${Math.round(pHi*100)}% vs ${Math.round((1-pHi)*100)}%. It's nearly a coin flip, so skipping this one is reasonable.`
+    : `Best call: ${word(best).toUpperCase()}${what} ${when}. ${fmtChance(bestP)} likely.`;
+  const pick = out.querySelector(".pick");
+  for (const [side, p] of [[hiSide, pHi], [loSide, 1-pHi]]){
+    const b = document.createElement("button");
+    b.type = "button"; b.dataset.side = side;
+    b.className = `side ${side===hiSide?"hi":"lo"}${side===best && !close ? " best" : ""}`;
+    b.setAttribute("aria-pressed", String(side===sel));
+    b.innerHTML = `<span class="s-name"></span><b class="mono"></b><small></small>`;
+    b.querySelector(".s-name").textContent = word(side) + what;
+    b.querySelector("b").textContent = fmtChance(p);
+    b.querySelector("small").textContent = side===best && !close ? "Best call" : rh && c ? `Robinhood: ${Math.round((side===hiSide?c:1-c)*100)}¢` : "";
+    if (side===best && !close && rh && c) b.querySelector("small").textContent = `Best call · Robinhood: ${Math.round((side===hiSide?c:1-c)*100)}¢`;
+    pick.appendChild(b);
+  }
   out.querySelector(".t-detail").textContent = a.detail;
+  if (rh && c){
+    const cp = out.querySelector(".t-crowd"); cp.hidden = false;
+    const edge = (best===hiSide ? pHi - c : (1-pHi) - (1-c));
+    cp.textContent = `Robinhood traders put "above" at ${Math.round(c*100)}%. ` + (close ? "" : Math.abs(edge) < 0.05
+      ? `The app roughly agrees with them on ${word(best)}.`
+      : edge > 0 ? `The app is more confident in ${word(best)} than they are.` : `The app is less confident in ${word(best)} than they are.`);
+  }
 }
+let pickKey = null, pickSide = null;
+$("tOut").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-side]"); if (!b) return;
+  pickSide = b.dataset.side; renderTarget();
+  if (lastAnswer && loadHist().some(h=>h.start===lastAnswer.w.start && h.K===lastAnswer.K && h.later==null)) saveGuess();
+});
 function saveGuess(){
   if (!lastAnswer) return;
   const a = lastAnswer, hist = loadHist();
@@ -937,7 +982,7 @@ $("tForm").addEventListener("submit", async e=>{
   e.preventDefault();
   if (state && $("useRH").checked && Date.now() - kal.at > 30000) await loadKalshi();
   if (!state || Date.now() - state.askedAt > 60000){ loadMsg = "Getting the latest price…"; if (state) showOut("t-wait", loadMsg); if (await ask() === false) return; }
-  renderTarget(); saveGuess();
+  pickSide = null; renderTarget(); saveGuess();
 });
 // Keep the window labels current; when a window ends, move the picker along with the clock.
 let lastStart = windows()[0].start;

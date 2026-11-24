@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v1VblMk2YM07NMgfaMS0wUpIBzJBa3zstgTu8tol9nQ=' 'sha256-Kg1CYXWPu8qx2qPkPX4/iZ2jW35QRdVoz6nN2JBjsSI='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://raw.githubusercontent.com https://api.kraken.com https://api.gemini.com https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v1VblMk2YM07NMgfaMS0wUpIBzJBa3zstgTu8tol9nQ=' 'sha256-eZgLelMiBFLe8LcN0HW1tQeYRcloCOvRb1NCJCGOjIs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://raw.githubusercontent.com https://api.kraken.com https://api.gemini.com https://api.exchange.coinbase.com https://api.binance.us https://data-api.binance.vision https://fapi.binance.com https://www.okx.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BTC Next 15</title>
@@ -132,6 +132,8 @@ details summary{cursor:pointer;font-weight:700}
 .t-detail{margin:0;font-size:14px}
 .rec{display:flex;flex-direction:column;gap:12px}
 .rec h2{margin:0}
+.tally{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px;margin:12px 0 0;font-size:14px}
+.tally b{font-size:20px;font-weight:600}
 .rec-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .rec-top b{font-size:28px;font-weight:600}
 .rec-top span{font-size:14px;min-width:0}
@@ -173,6 +175,7 @@ button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)
       <button type="submit" id="tGo">Predict</button>
     </form>
     <div id="tOut" class="t-out" aria-live="polite"><p class="t-wait">Getting prices… the first time takes about 15 seconds.</p></div>
+    <p class="tally" id="tally" hidden><span>Your picks:</span><b class="mono"><span class="ok-t" id="tWon">0</span> won · <span class="bad-t" id="tLost">0</span> lost</b><span id="tMore"></span></p>
   </section>
 
   <section class="card rec">
@@ -759,6 +762,11 @@ function renderHistory(hist){
     txt += ` When the order book leaned clearly one way, the window went that way ${agree} of ${withFlow.length} times.`;
   }
   $("histSummary").textContent = txt;
+  // Running win/loss tally of the picks saved on this phone (stored only in this browser).
+  const won = done.filter(h=>h.right).length, lost = done.length - won, wait = hist.filter(h=>h.right==null && !h.expired).length;
+  $("tally").hidden = !done.length && !wait;
+  $("tWon").textContent = won; $("tLost").textContent = lost;
+  $("tMore").textContent = (done.length ? `(${fmtPct(won/done.length)} right)` : "") + (wait ? ` ${wait} waiting for the window to end.` : "");
 }
 async function resolveHistory(hist){
   const pending = hist.filter(h=>h.later==null && !h.expired && Date.now() >= h.end + 60000);
